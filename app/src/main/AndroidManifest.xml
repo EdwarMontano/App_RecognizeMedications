@@ -32,6 +32,11 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".presentation.CameraDetectionActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
         <!-- Sentry -->
         <meta-data android:name="io.sentry.dsn" android:value="https://3f855d25a26c0d461edc8cb0025ae98a@o4506045063430144.ingest.us.sentry.io/4507388582821888" />
         <meta-data android:name="io.sentry.traces.user-interaction.enable" android:value="true" />

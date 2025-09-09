@@ -37,12 +37,17 @@ class OverlayView @JvmOverloads constructor(
     private var sourceHeight: Int = 0
 
     fun setResults(boundingBoxes: List<BoundingBox>) {
+        android.util.Log.d("OverlayView", "Setting ${boundingBoxes.size} bounding boxes")
+        boundingBoxes.forEachIndexed { index, box ->
+            android.util.Log.d("OverlayView", "Box $index: ${box.clsName} at (${box.x1}, ${box.y1}, ${box.x2}, ${box.y2}) conf=${box.cnf}")
+        }
         results = boundingBoxes
         invalidate()
     }
 
     /** Call this once you know the input image size to scale boxes properly. */
     fun setImageSourceInfo(width: Int, height: Int) {
+        android.util.Log.d("OverlayView", "Setting image source size: ${width}x${height}")
         sourceWidth = width
         sourceHeight = height
         invalidate()
@@ -50,22 +55,33 @@ class OverlayView @JvmOverloads constructor(
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        if (results.isEmpty()) return
+        
+        android.util.Log.d("OverlayView", "onDraw called. Results: ${results.size}, View size: ${width}x${height}, Source: ${sourceWidth}x${sourceHeight}")
+        
+        if (results.isEmpty()) {
+            android.util.Log.d("OverlayView", "No results to draw")
+            return
+        }
 
         val scaleX: Float = if (sourceWidth > 0) width.toFloat() / sourceWidth else 1f
         val scaleY: Float = if (sourceHeight > 0) height.toFloat() / sourceHeight else 1f
         val padding: Float = 8f * resources.displayMetrics.density
 
-        results.forEach { box ->
-            val left = box.left * scaleX
-            val top = box.top * scaleY
-            val right = box.right * scaleX
-            val bottom = box.bottom * scaleY
+        android.util.Log.d("OverlayView", "Scale factors: scaleX=$scaleX, scaleY=$scaleY")
+
+        results.forEachIndexed { index, box ->
+            // Scale coordinates from normalized (0-1) to actual pixels
+            val left = box.x1 * sourceWidth * scaleX
+            val top = box.y1 * sourceHeight * scaleY
+            val right = box.x2 * sourceWidth * scaleX
+            val bottom = box.y2 * sourceHeight * scaleY
+
+            android.util.Log.d("OverlayView", "Box $index scaled: ($left, $top, $right, $bottom)")
 
             val rect = RectF(left, top, right, bottom)
             canvas.drawRect(rect, boxPaint)
 
-            val label = "${box.label} ${(box.score * 100).toInt()}%"
+            val label = "${box.clsName} ${(box.cnf * 100).toInt()}%"
             val textWidth = textPaint.measureText(label)
             val bgRect = RectF(
                 rect.left,

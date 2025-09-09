@@ -69,12 +69,16 @@ dependencies {
     implementation("org.tensorflow:tensorflow-lite-gpu:2.14.0")
     implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
 
-    implementation("com.google.dagger:dagger:2.51.1")                 // <-- AÑADIDO (core)
+    implementation("com.google.dagger:dagger:2.51.1")
     kapt("com.google.dagger:dagger-compiler:2.51.1")
     implementation("com.google.dagger:hilt-android:2.51.1")
     kapt("com.google.dagger:hilt-compiler:2.51.1")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.4")
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.8.4")
+    
+    // Glide for image loading
+    implementation("com.github.bumptech.glide:glide:4.16.0")
+    kapt("com.github.bumptech.glide:compiler:4.16.0")
 }
 
 sentry {

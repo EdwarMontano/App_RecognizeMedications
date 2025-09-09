@@ -23,6 +23,12 @@
             android:id="@+id/action_menu_to_results"
             app:destination="@id/resultsFragment" />
         <action
+            android:id="@+id/action_menu_to_upload_photo"
+            app:destination="@id/resultsFragment" />
+        <action
+            android:id="@+id/action_menu_to_measurement"
+            app:destination="@id/resultsFragment" />
+        <action
             android:id="@+id/action_menu_to_help"
             app:destination="@id/helpFragment" />
     </fragment>

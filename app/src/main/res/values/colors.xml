@@ -7,5 +7,6 @@
     <color name="menu_bg">#FFFFFFFF</color>
     <color name="menu_button_tint">#37C7C9</color>   <!-- turquesa -->
     <color name="menu_button_text">#FFFFFFFF</color> <!-- blanco -->
-
+    <color name="shutter_red">#E53935</color>   <!-- ajusta a tu paleta -->
+    <color name="on_shutter">#FFFFFFFF</color>
 </resources>

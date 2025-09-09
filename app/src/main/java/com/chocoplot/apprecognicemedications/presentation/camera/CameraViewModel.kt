@@ -7,7 +7,6 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import com.chocoplot.apprecognicemedications.core.Constants
 import com.chocoplot.apprecognicemedications.ml.Detector
-import com.chocoplot.apprecognicemedications.ml.DetectorListener
 import com.chocoplot.apprecognicemedications.ml.model.BoundingBox
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -21,7 +20,7 @@ class CameraViewModel @Inject constructor() : ViewModel() {
     private val _inferenceTime: MutableLiveData<Long> = MutableLiveData(0L)
     val inferenceTime: LiveData<Long> = _inferenceTime
 
-    fun createDetector(ctx: Context, listener: DetectorListener): Detector =
+    fun createDetector(ctx: Context, listener: Detector.DetectorListener): Detector =
         Detector(ctx, Constants.MODEL_PATH, Constants.LABELS_PATH, listener).apply { setup() }
 
     fun updateResults(boxes: List<BoundingBox>, timeMs: Long) {

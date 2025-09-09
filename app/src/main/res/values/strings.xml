@@ -2,17 +2,25 @@
     <string name="app_name">UV Recognicomiento Medicamentos</string>
 
     <!-- Camera / Overlay -->
-    <string name="camera_title">Camera</string>
+    <string name="camera_title">Cámara</string>
     <string name="content_desc_overlay">Detection overlay</string>
     <string name="content_desc_capture">Capture photo</string>
     <string name="content_desc_logo_left">Left partner logo</string>
     <string name="content_desc_logo_right">Right partner logo</string>
     <string name="inference_time">%1$d ms</string>
+    
+    <!-- Camera Modes -->
+    <string name="mode_slo_mo">slo-mo</string>
+    <string name="mode_video">video</string>
+    <string name="mode_foto">Foto</string>
+    <string name="mode_square">square</string>
+    <string name="mode_pano">pano</string>
 
     <!-- Menu -->
     <string name="take_photo">Tomar Foto</string>
-    <string name="upload_photo">Subir Foto</string>
     <string name="measurement">Medición</string>
+    <string name="upload_photo">Reconocer Medicamentos</string>
+
     <string name="help">Ayuda</string>
     <string name="settings">Configuración</string>
 
