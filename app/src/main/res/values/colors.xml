@@ -2,5 +2,10 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="light_gray">#f6f6f6</color>
     <color name="bounding_box_color">#234567</color>
+    <color name="menu_bg">#FFFFFFFF</color>
+    <color name="menu_button_tint">#37C7C9</color>   <!-- turquesa -->
+    <color name="menu_button_text">#FFFFFFFF</color> <!-- blanco -->
+
 </resources>

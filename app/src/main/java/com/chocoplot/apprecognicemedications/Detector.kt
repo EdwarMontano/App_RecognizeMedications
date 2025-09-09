@@ -196,6 +196,6 @@ class Detector(
         private val INPUT_IMAGE_TYPE = DataType.FLOAT32
         private val OUTPUT_IMAGE_TYPE = DataType.FLOAT32
         private const val CONFIDENCE_THRESHOLD = 0.3F
-        private const val IOU_THRESHOLD = 0.5F
+        private const val IOU_THRESHOLD = 0.4F
     }
 }

@@ -2,10 +2,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <uses-feature android:name="android.hardware.camera" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <!-- Para Android <=12 -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32"/>
+
 
     <application
+        android:name="com.chocoplot.apprecognicemedications.App"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -15,15 +21,24 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.AppRecogniceMedications"
         tools:targetApi="31">
+
         <activity
-            android:name=".MainActivity"
-            android:exported="true">
+            android:name=".presentation.MainActivity"
+            android:exported="true"
+            android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Sentry -->
+        <meta-data android:name="io.sentry.dsn" android:value="https://3f855d25a26c0d461edc8cb0025ae98a@o4506045063430144.ingest.us.sentry.io/4507388582821888" />
+        <meta-data android:name="io.sentry.traces.user-interaction.enable" android:value="true" />
+        <meta-data android:name="io.sentry.attach-screenshot" android:value="true" />
+        <meta-data android:name="io.sentry.attach-view-hierarchy" android:value="true" />
+        <meta-data android:name="io.sentry.traces.sample-rate" android:value="1.0" />
+        <meta-data android:name="io.sentry.traces.profiling.sample-rate" android:value="1.0" />
     </application>
 
 </manifest>

@@ -1,3 +1,22 @@
 <resources>
-    <string name="app_name">UV Recognize Medications</string>
+    <string name="app_name">UV Recognicomiento Medicamentos</string>
+
+    <!-- Camera / Overlay -->
+    <string name="camera_title">Camera</string>
+    <string name="content_desc_overlay">Detection overlay</string>
+    <string name="content_desc_capture">Capture photo</string>
+    <string name="content_desc_logo_left">Left partner logo</string>
+    <string name="content_desc_logo_right">Right partner logo</string>
+    <string name="inference_time">%1$d ms</string>
+
+    <!-- Menu -->
+    <string name="take_photo">Tomar Foto</string>
+    <string name="upload_photo">Subir Foto</string>
+    <string name="measurement">Medición</string>
+    <string name="help">Ayuda</string>
+    <string name="settings">Configuración</string>
+
+    <!-- Welcome -->
+    <string name="version_name">v1.0</string>
+    <string name="continue_label">Continue</string>
 </resources>

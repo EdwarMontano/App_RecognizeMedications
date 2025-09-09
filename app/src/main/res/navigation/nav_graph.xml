@@ -1,0 +1,40 @@
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/welcomeFragment">
+
+    <fragment
+        android:id="@+id/welcomeFragment"
+        android:name="com.chocoplot.apprecognicemedications.presentation.welcome.WelcomeFragment"
+        android:label="Welcome">
+        <action
+            android:id="@+id/action_welcome_to_menu"
+            app:destination="@id/menuFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/menuFragment"
+        android:name="com.chocoplot.apprecognicemedications.presentation.menu.MenuFragment"
+        android:label="Menu">
+        <action
+            android:id="@+id/action_menu_to_camera"
+            app:destination="@id/cameraFragment" />
+        <action
+            android:id="@+id/action_menu_to_results"
+            app:destination="@id/resultsFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/cameraFragment"
+        android:name="com.chocoplot.apprecognicemedications.presentation.camera.CameraFragment"
+        android:label="Camera">
+        <action
+            android:id="@+id/action_camera_to_results"
+            app:destination="@id/resultsFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/resultsFragment"
+        android:name="com.chocoplot.apprecognicemedications.presentation.results.ResultsFragment"
+        android:label="Results" />
+</navigation>

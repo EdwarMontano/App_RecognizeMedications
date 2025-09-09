@@ -1,9 +1,7 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
-    <style name="Base.Theme.AppRecogniceMedications" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your light theme here. -->
-        <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+    <style name="Theme.AppRecogniceMedications" parent="Theme.Material3.Light.NoActionBar">
+        <!-- Colores por defecto; ajusta si ya usas MaterialColorScheme -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
     </style>
-
-    <style name="Theme.AppRecogniceMedications" parent="Base.Theme.AppRecogniceMedications" />
 </resources>
