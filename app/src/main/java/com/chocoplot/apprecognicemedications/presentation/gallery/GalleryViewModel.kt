@@ -24,14 +24,14 @@ import javax.inject.Inject
 @HiltViewModel
 class GalleryViewModel @Inject constructor() : ViewModel(), Detector.DetectorListener {
 
-    private val _galleryPhotos = MutableLiveData<List<Uri>>(emptyList())
-    val galleryPhotos: LiveData<List<Uri>> = _galleryPhotos
+    private val _galleryPhotos = MutableLiveData<List<GalleryPhoto>>(emptyList())
+    val galleryPhotos: LiveData<List<GalleryPhoto>> = _galleryPhotos
 
     private val _currentPhotoIndex = MutableLiveData(0)
     val currentPhotoIndex: LiveData<Int> = _currentPhotoIndex
 
-    private val _currentPhoto = MutableLiveData<Uri?>()
-    val currentPhoto: LiveData<Uri?> = _currentPhoto
+    private val _currentPhoto = MutableLiveData<GalleryPhoto?>()
+    val currentPhoto: LiveData<GalleryPhoto?> = _currentPhoto
 
     private val _results = MutableLiveData<List<BoundingBox>>(emptyList())
     val results: LiveData<List<BoundingBox>> = _results
@@ -84,32 +84,45 @@ class GalleryViewModel @Inject constructor() : ViewModel(), Detector.DetectorLis
         }
     }
 
-    private fun getGalleryPhotos(context: Context): List<Uri> {
-        val photos = mutableListOf<Uri>()
+    private fun getGalleryPhotos(context: Context): List<GalleryPhoto> {
+        val photos = mutableListOf<GalleryPhoto>()
         
         val projection = arrayOf(
             MediaStore.Images.Media._ID,
-            MediaStore.Images.Media.DATE_ADDED
+            MediaStore.Images.Media.DISPLAY_NAME,
+            MediaStore.Images.Media.DATE_ADDED,
+            MediaStore.Images.Media.RELATIVE_PATH
         )
         
+        // Filter for app-taken photos: look for "MedRecognition" in display name
+        val selection = "${MediaStore.Images.Media.DISPLAY_NAME} LIKE ?"
+        val selectionArgs = arrayOf("MedRecognition_%")
         val sortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
         
         context.contentResolver.query(
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
             projection,
-            null,
-            null,
+            selection,
+            selectionArgs,
             sortOrder
         )?.use { cursor ->
             val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+            val displayNameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
+            val dateAddedColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
             
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idColumn)
-                val uri = ContentUris.withAppendedId(
-                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                    id
-                )
-                photos.add(uri)
+                val displayName = cursor.getString(displayNameColumn) ?: ""
+                val dateAdded = cursor.getLong(dateAddedColumn)
+                
+                // Double-check the naming pattern
+                if (displayName.startsWith("MedRecognition_")) {
+                    val uri = ContentUris.withAppendedId(
+                        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                        id
+                    )
+                    photos.add(GalleryPhoto(uri, dateAdded, displayName))
+                }
             }
         }
         
@@ -142,12 +155,12 @@ class GalleryViewModel @Inject constructor() : ViewModel(), Detector.DetectorLis
     }
 
     fun processCurrentPhoto(context: Context) {
-        val currentPhotoUri = _currentPhoto.value ?: return
-        Log.d("GalleryViewModel", "Processing photo: $currentPhotoUri")
+        val currentPhoto = _currentPhoto.value ?: return
+        Log.d("GalleryViewModel", "Processing photo: ${currentPhoto.uri}")
         viewModelScope.launch {
             try {
                 val bitmap = withContext(Dispatchers.IO) {
-                    loadBitmapFromUri(context, currentPhotoUri)
+                    loadBitmapFromUri(context, currentPhoto.uri)
                 }
                 bitmap?.let { bmp ->
                     Log.d("GalleryViewModel", "Loaded bitmap: ${bmp.width}x${bmp.height}")

@@ -48,7 +48,16 @@
     <fragment
         android:id="@+id/resultsFragment"
         android:name="com.chocoplot.apprecognicemedications.presentation.results.ResultsFragment"
-        android:label="Results" />
+        android:label="Results">
+        <action
+            android:id="@+id/action_results_to_photo_detail"
+            app:destination="@id/photoDetailFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/photoDetailFragment"
+        android:name="com.chocoplot.apprecognicemedications.presentation.results.PhotoDetailFragment"
+        android:label="Photo Detail" />
 
     <fragment
         android:id="@+id/helpFragment"
