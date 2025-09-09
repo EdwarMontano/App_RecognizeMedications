@@ -22,6 +22,9 @@
         <action
             android:id="@+id/action_menu_to_results"
             app:destination="@id/resultsFragment" />
+        <action
+            android:id="@+id/action_menu_to_help"
+            app:destination="@id/helpFragment" />
     </fragment>
 
     <fragment
@@ -37,4 +40,9 @@
         android:id="@+id/resultsFragment"
         android:name="com.chocoplot.apprecognicemedications.presentation.results.ResultsFragment"
         android:label="Results" />
+
+    <fragment
+        android:id="@+id/helpFragment"
+        android:name="com.chocoplot.apprecognicemedications.presentation.help.HelpFragment"
+        android:label="@string/help_title" />
 </navigation>

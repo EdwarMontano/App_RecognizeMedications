@@ -19,4 +19,11 @@
     <!-- Welcome -->
     <string name="version_name">v1.0</string>
     <string name="continue_label">Continue</string>
+    
+    <!-- Help -->
+    <string name="help_title">Ayuda</string>
+    <string name="help_tips_title">Consejos:</string>
+    <string name="help_tip_1">Recuerda tener buena iluminación a la hora de tomar las fotografías</string>
+    <string name="help_tip_2">Trata de siempre tomar la imagen más nítida posible para maximizar los resultados</string>
+    <string name="help_continue_button">Continuar!</string>
 </resources>

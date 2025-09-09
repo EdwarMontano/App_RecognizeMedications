@@ -18,14 +18,19 @@ class MenuFragment : Fragment() {
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        
         binding.takePhotoButton.setOnClickListener {
             findNavController().navigate(R.id.action_menu_to_camera)
         }
         binding.uploadPhotoButton.setOnClickListener {
             findNavController().navigate(R.id.action_menu_to_results)
         }
+        binding.helpButton.setOnClickListener {
+            findNavController().navigate(R.id.action_menu_to_help)
+        }
 
-        // botones: measurement, help (F), settings (G)
+        // botones: measurement, settings (G)
     }
 
     override fun onDestroyView() {
