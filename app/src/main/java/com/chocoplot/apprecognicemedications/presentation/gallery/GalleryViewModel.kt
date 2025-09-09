@@ -21,6 +21,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
+data class GalleryPhoto(
+    val uri: Uri,
+    val dateAdded: Long,
+    val displayName: String
+)
+
 @HiltViewModel
 class GalleryViewModel @Inject constructor() : ViewModel(), Detector.DetectorListener {
 

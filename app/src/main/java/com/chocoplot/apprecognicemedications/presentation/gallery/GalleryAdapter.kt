@@ -13,12 +13,6 @@ import com.chocoplot.apprecognicemedications.databinding.ItemGalleryPhotoBinding
 import java.text.SimpleDateFormat
 import java.util.*
 
-data class GalleryPhoto(
-    val uri: Uri,
-    val dateAdded: Long,
-    val displayName: String
-)
-
 class GalleryAdapter(
     private val onPhotoClick: (GalleryPhoto) -> Unit
 ) : ListAdapter<GalleryPhoto, GalleryAdapter.GalleryPhotoViewHolder>(DiffCallback()) {
