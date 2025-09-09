@@ -40,8 +40,10 @@ class MenuFragment : Fragment() {
         binding.helpButton.setOnClickListener {
             findNavController().navigate(R.id.action_menu_to_help)
         }
-
-        // TODO: settings button functionality
+        
+        binding.settingsButton.setOnClickListener {
+            findNavController().navigate(R.id.action_menu_to_settings)
+        }
     }
 
     override fun onDestroyView() {

@@ -3,6 +3,7 @@ package com.chocoplot.apprecognicemedications
 import android.content.Context
 import android.graphics.Bitmap
 import android.os.SystemClock
+import com.chocoplot.apprecognicemedications.data.SettingsRepository
 import org.tensorflow.lite.DataType
 import org.tensorflow.lite.Interpreter
 import org.tensorflow.lite.support.common.FileUtil
@@ -25,6 +26,7 @@ class Detector(
 
     private var interpreter: Interpreter? = null
     private var labels = mutableListOf<String>()
+    private val settingsRepository = SettingsRepository(context)
 
     private var tensorWidth = 0
     private var tensorHeight = 0
@@ -122,7 +124,7 @@ class Detector(
                 arrayIdx += numElements
             }
 
-            if (maxConf > CONFIDENCE_THRESHOLD) {
+            if (maxConf > settingsRepository.getConfidenceThreshold()) {
                 val clsName = labels[maxIdx]
                 val cx = array[c] // 0
                 val cy = array[c + numElements] // 1
@@ -165,7 +167,7 @@ class Detector(
             while (iterator.hasNext()) {
                 val nextBox = iterator.next()
                 val iou = calculateIoU(first, nextBox)
-                if (iou >= IOU_THRESHOLD) {
+                if (iou >= settingsRepository.getIouThreshold()) {
                     iterator.remove()
                 }
             }

@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">UV Recognicomiento Medicamentos</string>
+    <string name="app_name">UV Reconocimiento de Medicamentos</string>
 
     <!-- Camera / Overlay -->
     <string name="camera_title">Cámara</string>
@@ -18,11 +18,21 @@
 
     <!-- Menu -->
     <string name="take_photo">Tomar Foto</string>
-    <string name="measurement">Medición</string>
-    <string name="upload_photo">Reconocer Medicamentos</string>
+    <string name="measurement">Galería</string>
+    <string name="upload_photo">Inferencia Medicamentos</string>
 
     <string name="help">Ayuda</string>
     <string name="settings">Configuración</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Configuraciones</string>
+    <string name="confidence_threshold_title">Confidence threshold</string>
+    <string name="confidence_threshold_description">Umbral de confianza para la detección de medicamentos</string>
+    <string name="iou_threshold_title">IoU threshold</string>
+    <string name="iou_threshold_description">Umbral de intersección sobre unión para filtrar detecciones</string>
+    <string name="save_button">Guardar</string>
+    <string name="settings_saved">Configuraciones guardadas exitosamente</string>
+    <string name="error_invalid_value">Valor inválido. Debe estar entre 0.0 y 1.0</string>
 
     <!-- Welcome -->
     <string name="version_name">v1.0</string>
