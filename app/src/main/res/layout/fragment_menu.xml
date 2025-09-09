@@ -49,10 +49,23 @@
     <com.google.android.material.button.MaterialButton
         android:id="@+id/uploadPhotoButton"
         style="@style/Widget.App.PillButton"
-        android:text="@string/upload_photo"
+        android:text="@string/inference_local"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         app:layout_constraintTop_toBottomOf="@id/measurementButton"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginStart="24dp"
+        android:layout_marginEnd="24dp"
+        android:layout_marginTop="16dp"/>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/remoteInferenceButton"
+        style="@style/Widget.App.PillButton"
+        android:text="@string/inference_remote"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@id/uploadPhotoButton"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginStart="24dp"
@@ -65,7 +78,7 @@
         android:text="@string/settings"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        app:layout_constraintTop_toBottomOf="@id/uploadPhotoButton"
+        app:layout_constraintTop_toBottomOf="@id/remoteInferenceButton"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginStart="24dp"

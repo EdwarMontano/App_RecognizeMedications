@@ -19,7 +19,8 @@
     <!-- Menu -->
     <string name="take_photo">Tomar Foto</string>
     <string name="measurement">Galería</string>
-    <string name="upload_photo">Inferencia Medicamentos</string>
+    <string name="inference_local">Inferencia Local</string>
+    <string name="inference_remote">Inferencia Remota</string>
 
     <string name="help">Ayuda</string>
     <string name="settings">Configuración</string>

@@ -23,7 +23,7 @@
             android:id="@+id/action_menu_to_results"
             app:destination="@id/resultsFragment" />
         <action
-            android:id="@+id/action_menu_to_upload_photo"
+            android:id="@+id/action_menu_to_inference_local"
             app:destination="@id/resultsFragment" />
         <action
             android:id="@+id/action_menu_to_measurement"

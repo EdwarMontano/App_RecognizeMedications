@@ -2,6 +2,7 @@
 package com.chocoplot.apprecognicemedications.presentation.menu
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.*
 import androidx.fragment.app.Fragment
@@ -39,6 +40,12 @@ class MenuFragment : Fragment() {
         }
         binding.helpButton.setOnClickListener {
             findNavController().navigate(R.id.action_menu_to_help)
+        }
+        
+        binding.remoteInferenceButton.setOnClickListener {
+            // Abrir el enlace de Hugging Face para inferencia remota
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://huggingface.co/spaces/chocoplot/UV-RecognizerMedications"))
+            startActivity(intent)
         }
         
         binding.settingsButton.setOnClickListener {
