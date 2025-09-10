@@ -181,7 +181,22 @@ class CameraDetectionActivity : AppCompatActivity(), Detector.DetectorListener {
     }
 
     override fun onEmptyDetect() {
-        binding.overlay.invalidate()
+        runOnUiThread {
+            // Clear the overlay by setting empty results
+            binding.overlay.apply {
+                setResults(emptyList())
+                invalidate()
+            }
+            
+            // Clear medication counts
+            medicationAdapter.updateCounts(emptyList())
+            
+            // Reset total count
+            binding.totalCount.text = "0 total"
+            
+            // Clear inference time or keep last one
+            // binding.inferenceTime.text = "0ms"
+        }
     }
 
     override fun onDetect(boundingBoxes: List<BoundingBox>, inferenceTime: Long) {
