@@ -26,7 +26,7 @@
             android:id="@+id/action_menu_to_inference_local"
             app:destination="@id/resultsFragment" />
         <action
-            android:id="@+id/action_menu_to_measurement"
+            android:id="@+id/action_menu_to_gallery"
             app:destination="@id/resultsFragment" />
         <action
             android:id="@+id/action_menu_to_help"

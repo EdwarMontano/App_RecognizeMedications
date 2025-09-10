@@ -14,7 +14,7 @@ import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.GridLayoutManager
 import com.chocoplot.apprecognicemedications.R
-import com.chocoplot.apprecognicemedications.databinding.FragmentResultsBinding
+import com.chocoplot.apprecognicemedications.databinding.FragmentGalleryBinding
 import com.chocoplot.apprecognicemedications.presentation.gallery.GalleryViewModel
 import com.chocoplot.apprecognicemedications.presentation.gallery.GalleryAdapter
 import com.chocoplot.apprecognicemedications.presentation.gallery.GalleryPhoto
@@ -22,7 +22,7 @@ import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class ResultsFragment : Fragment() {
-    private var _binding: FragmentResultsBinding? = null
+    private var _binding: FragmentGalleryBinding? = null
     private val binding get() = _binding!!
     private val galleryVm: GalleryViewModel by viewModels()
     
@@ -41,7 +41,7 @@ class ResultsFragment : Fragment() {
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-        _binding = FragmentResultsBinding.inflate(inflater, container, false)
+        _binding = FragmentGalleryBinding.inflate(inflater, container, false)
         return binding.root
     }
 

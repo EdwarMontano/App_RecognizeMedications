@@ -31,12 +31,12 @@ class MenuFragment : Fragment() {
             val intent = Intent(requireContext(), CameraDetectionActivity::class.java)
             startActivity(intent)
         }
-        binding.measurementButton.setOnClickListener {
+        binding.galleryButton.setOnClickListener {
             // Navigate to results with gallery mode for measurement
             val bundle = Bundle().apply {
                 putBoolean("gallery_mode", true)
             }
-            findNavController().navigate(R.id.action_menu_to_measurement, bundle)
+            findNavController().navigate(R.id.action_menu_to_gallery, bundle)
         }
         binding.helpButton.setOnClickListener {
             findNavController().navigate(R.id.action_menu_to_help)
