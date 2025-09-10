@@ -57,6 +57,9 @@ class CameraFragment : Fragment(), Detector.DetectorListener {
     
     // Add surface state management
     private var isSurfaceReady = false
+    
+    // Photo counters
+    private var sessionPhotosCount = 0
 
     private val requestCameraPermission = registerForActivityResult(RequestPermission()) { isGranted ->
         if (isGranted) startCamera()
@@ -142,11 +145,42 @@ class CameraFragment : Fragment(), Detector.DetectorListener {
         // Load and apply initial display settings
         val displayVisible = settingsRepository.getDisplayElementsVisible()
         settingsViewModel.setDisplayElementsVisible(displayVisible)
+        
+        // Initialize photo counters
+        updatePhotoCounters()
     }
     
     private fun updateElementsVisibility(isVisible: Boolean) {
         binding.settingsDisplay.visibility = if (isVisible) View.VISIBLE else View.GONE
         binding.inferenceTime.visibility = if (isVisible) View.VISIBLE else View.GONE
+    }
+    
+    private fun updatePhotoCounters() {
+        // Update session counter
+        binding.sessionPhotosCount.text = getString(R.string.photos_count_format, sessionPhotosCount)
+        
+        // Get total gallery count
+        val totalCount = getTotalGalleryPhotosCount()
+        binding.totalPhotosCount.text = getString(R.string.photos_count_format, totalCount)
+    }
+    
+    private fun getTotalGalleryPhotosCount(): Int {
+        var count = 0
+        val projection = arrayOf(MediaStore.Images.Media._ID)
+        val selection = "${MediaStore.Images.Media.DISPLAY_NAME} LIKE ?"
+        val selectionArgs = arrayOf("MedRecognition_%")
+        
+        requireContext().contentResolver.query(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            projection,
+            selection,
+            selectionArgs,
+            null
+        )?.use { cursor ->
+            count = cursor.count
+        }
+        
+        return count
     }
 
     private fun hasCameraPermission(): Boolean =
@@ -493,6 +527,10 @@ class CameraFragment : Fragment(), Detector.DetectorListener {
                         "Foto guardada en galería",
                         Toast.LENGTH_SHORT
                     ).show()
+                    
+                    // Increment session counter and update displays
+                    sessionPhotosCount++
+                    updatePhotoCounters()
                 }
             }
         )

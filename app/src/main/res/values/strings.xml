@@ -47,4 +47,9 @@
     <string name="help_tip_1">Recuerda tener buena iluminación a la hora de tomar las fotografías</string>
     <string name="help_tip_2">Trata de siempre tomar la imagen más nítida posible para maximizar los resultados</string>
     <string name="help_continue_button">Continuar!</string>
+    
+    <!-- Photo Counter -->
+    <string name="session_photos_label">Fotos sesión:</string>
+    <string name="total_photos_label">Total galería:</string>
+    <string name="photos_count_format">%1$d</string>
 </resources>

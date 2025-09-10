@@ -112,7 +112,82 @@
             app:layout_constraintBottom_toTopOf="@id/logoLeft"
             app:layout_constraintStart_toStartOf="parent" />
 
+        <!-- Photo Counter -->
+
         <!-- Logo izquierdo -->
+
+        <LinearLayout
+            android:id="@+id/photoCounterContainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="16dp"
+            android:layout_marginBottom="92dp"
+            android:background="@drawable/bg_inference_chip"
+            android:orientation="vertical"
+            android:padding="12dp"
+            app:layout_constraintBottom_toTopOf="@id/logoLeft"
+            app:layout_constraintEnd_toStartOf="@id/captureButton"
+            app:layout_constraintHorizontal_bias="1.0"
+            app:layout_constraintStart_toEndOf="@id/galleryThumbnail">
+
+            <!-- Session Photos Counter -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="4dp"
+                    android:text="@string/session_photos_label"
+                    android:textAppearance="?attr/textAppearanceBodySmall"
+                    android:textColor="?attr/colorOnPrimary" />
+
+                <TextView
+                    android:id="@+id/sessionPhotosCount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:animateLayoutChanges="true"
+                    android:textAppearance="?attr/textAppearanceBodyMedium"
+                    android:textColor="?attr/colorOnPrimary"
+                    android:textStyle="bold"
+                    tools:text="0" />
+
+            </LinearLayout>
+
+            <!-- Total Photos Counter -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="4dp"
+                    android:text="@string/total_photos_label"
+                    android:textAppearance="?attr/textAppearanceBodySmall"
+                    android:textColor="?attr/colorOnPrimary" />
+
+                <TextView
+                    android:id="@+id/totalPhotosCount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:animateLayoutChanges="true"
+                    android:textAppearance="?attr/textAppearanceBodyMedium"
+                    android:textColor="?attr/colorOnPrimary"
+                    android:textStyle="bold"
+                    tools:text="0" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
         <ImageView
             android:id="@+id/logoLeft"
             android:layout_width="wrap_content"
