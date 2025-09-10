@@ -45,6 +45,12 @@ class CameraDetectionActivity : AppCompatActivity(), Detector.DetectorListener {
 
         // Configurar botón de regreso
         binding.backButton.setOnClickListener {
+            // Cleanup before finishing
+            try {
+                cameraProvider?.unbindAll()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error unbinding camera on back button", e)
+            }
             finish()
         }
 
@@ -80,61 +86,89 @@ class CameraDetectionActivity : AppCompatActivity(), Detector.DetectorListener {
     }
 
     private fun bindCameraUseCases() {
-        val cameraProvider = cameraProvider ?: throw IllegalStateException("Camera initialization failed.")
+        val cameraProvider = cameraProvider ?: run {
+            Log.e(TAG, "Camera provider is null")
+            return
+        }
 
-        val rotation = binding.viewFinder.display.rotation
+        try {
+            val rotation = binding.viewFinder.display.rotation
 
-        val cameraSelector = CameraSelector
-            .Builder()
-            .requireLensFacing(CameraSelector.LENS_FACING_BACK)
-            .build()
+            val cameraSelector = CameraSelector
+                .Builder()
+                .requireLensFacing(CameraSelector.LENS_FACING_BACK)
+                .build()
 
-        preview = Preview.Builder()
-            .setTargetAspectRatio(AspectRatio.RATIO_DEFAULT)
-            .setTargetRotation(rotation)
-            .build()
+            preview = Preview.Builder()
+                .setTargetAspectRatio(AspectRatio.RATIO_DEFAULT)
+                .setTargetRotation(rotation)
+                .build()
 
-        imageAnalyzer = ImageAnalysis.Builder()
-            .setTargetAspectRatio(AspectRatio.RATIO_DEFAULT)
-            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-            .setTargetRotation(binding.viewFinder.display.rotation)
-            .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
-            .build()
+            imageAnalyzer = ImageAnalysis.Builder()
+                .setTargetAspectRatio(AspectRatio.RATIO_DEFAULT)
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .setTargetRotation(binding.viewFinder.display.rotation)
+                .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+                .build()
 
-        imageAnalyzer?.setAnalyzer(cameraExecutor) { imageProxy ->
-            val bitmapBuffer =
-                Bitmap.createBitmap(
-                    imageProxy.width,
-                    imageProxy.height,
-                    Bitmap.Config.ARGB_8888
-                )
-            imageProxy.use { bitmapBuffer.copyPixelsFromBuffer(imageProxy.planes[0].buffer) }
-            imageProxy.close()
+            imageAnalyzer?.setAnalyzer(cameraExecutor) { imageProxy ->
+                try {
+                    // Add null checks and proper error handling
+                    if (imageProxy.width <= 0 || imageProxy.height <= 0) {
+                        imageProxy.close()
+                        return@setAnalyzer
+                    }
 
-            val matrix = Matrix().apply {
-                postRotate(imageProxy.imageInfo.rotationDegrees.toFloat())
-
-                if (isFrontCamera) {
-                    postScale(
-                        -1f,
-                        1f,
-                        imageProxy.width.toFloat(),
-                        imageProxy.height.toFloat()
+                    val bitmapBuffer = Bitmap.createBitmap(
+                        imageProxy.width,
+                        imageProxy.height,
+                        Bitmap.Config.ARGB_8888
                     )
+                    
+                    imageProxy.use {
+                        try {
+                            bitmapBuffer.copyPixelsFromBuffer(imageProxy.planes[0].buffer)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error copying pixels from buffer", e)
+                            return@setAnalyzer
+                        }
+                    }
+
+                    val matrix = Matrix().apply {
+                        postRotate(imageProxy.imageInfo.rotationDegrees.toFloat())
+
+                        if (isFrontCamera) {
+                            postScale(
+                                -1f,
+                                1f,
+                                imageProxy.width.toFloat(),
+                                imageProxy.height.toFloat()
+                            )
+                        }
+                    }
+
+                    val rotatedBitmap = Bitmap.createBitmap(
+                        bitmapBuffer, 0, 0, bitmapBuffer.width, bitmapBuffer.height,
+                        matrix, true
+                    )
+
+                    // Clean up the original bitmap if it's different from rotated
+                    if (rotatedBitmap != bitmapBuffer && !bitmapBuffer.isRecycled) {
+                        bitmapBuffer.recycle()
+                    }
+
+                    detector.detect(rotatedBitmap)
+                    
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error in image analysis", e)
+                    imageProxy.close()
                 }
             }
 
-            val rotatedBitmap = Bitmap.createBitmap(
-                bitmapBuffer, 0, 0, bitmapBuffer.width, bitmapBuffer.height,
-                matrix, true
-            )
+            // Unbind all use cases before rebinding
+            cameraProvider.unbindAll()
 
-            detector.detect(rotatedBitmap)
-        }
-
-        cameraProvider.unbindAll()
-
-        try {
+            // Bind use cases to lifecycle
             camera = cameraProvider.bindToLifecycle(
                 this,
                 cameraSelector,
@@ -143,6 +177,7 @@ class CameraDetectionActivity : AppCompatActivity(), Detector.DetectorListener {
             )
 
             preview?.setSurfaceProvider(binding.viewFinder.surfaceProvider)
+            
         } catch(exc: Exception) {
             Log.e(TAG, "Use case binding failed", exc)
         }
@@ -157,19 +192,62 @@ class CameraDetectionActivity : AppCompatActivity(), Detector.DetectorListener {
         if (it[Manifest.permission.CAMERA] == true) { startCamera() }
     }
 
+    override fun onPause() {
+        super.onPause()
+        // Stop camera and clear resources when activity is paused
+        try {
+            cameraProvider?.unbindAll()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error unbinding camera", e)
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Additional cleanup when activity is stopped
+        try {
+            cameraProvider?.unbindAll()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error unbinding camera in onStop", e)
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
-        detector.clear()
-        cameraExecutor.shutdown()
+        try {
+            // Unbind camera first
+            cameraProvider?.unbindAll()
+            // Clear detector
+            detector.clear()
+            // Shutdown executor
+            if (!cameraExecutor.isShutdown) {
+                cameraExecutor.shutdown()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in onDestroy", e)
+        }
     }
 
     override fun onResume() {
         super.onResume()
         if (allPermissionsGranted()){
-            startCamera()
+            // Only start camera if it's not already running
+            if (cameraProvider == null || camera == null) {
+                startCamera()
+            }
         } else {
             requestPermissionLauncher.launch(REQUIRED_PERMISSIONS)
         }
+    }
+
+    override fun onBackPressed() {
+        // Cleanup before going back
+        try {
+            cameraProvider?.unbindAll()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error unbinding camera on back pressed", e)
+        }
+        super.onBackPressed()
     }
 
     companion object {
