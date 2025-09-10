@@ -21,7 +21,9 @@ import com.chocoplot.apprecognicemedications.BoundingBox
 import com.chocoplot.apprecognicemedications.Detector
 import com.chocoplot.apprecognicemedications.core.Constants.LABELS_PATH
 import com.chocoplot.apprecognicemedications.core.Constants.MODEL_PATH
+import com.chocoplot.apprecognicemedications.data.SettingsRepository
 import com.chocoplot.apprecognicemedications.databinding.ActivityCameraDetectionBinding
+import android.view.View
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -37,11 +39,18 @@ class CameraDetectionActivity : AppCompatActivity(), Detector.DetectorListener {
 
     private lateinit var cameraExecutor: ExecutorService
     private lateinit var medicationAdapter: MedicationCountAdapter
+    private lateinit var settingsRepository: SettingsRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityCameraDetectionBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        // Initialize settings repository
+        settingsRepository = SettingsRepository(this)
+        
+        // Apply display settings
+        updateElementsVisibility()
 
         // Configurar botón de regreso
         binding.backButton.setOnClickListener {
@@ -303,5 +312,10 @@ class CameraDetectionActivity : AppCompatActivity(), Detector.DetectorListener {
 
         // Actualizar lista
         medicationAdapter.updateCounts(medicationCounts)
+    }
+    
+    private fun updateElementsVisibility() {
+        val isVisible = settingsRepository.getDisplayElementsVisible()
+        binding.inferenceTime.visibility = if (isVisible) View.VISIBLE else View.GONE
     }
 }

@@ -31,6 +31,8 @@
     <string name="confidence_threshold_description">Umbral de confianza para la detección de medicamentos</string>
     <string name="iou_threshold_title">IoU threshold</string>
     <string name="iou_threshold_description">Umbral de intersección sobre unión para filtrar detecciones</string>
+    <string name="display_elements_title">Mostrar elementos informativos</string>
+    <string name="display_elements_description">Mostrar configuraciones y tiempo de inferencia en pantalla</string>
     <string name="save_button">Guardar</string>
     <string name="settings_saved">Configuraciones guardadas exitosamente</string>
     <string name="error_invalid_value">Valor inválido. Debe estar entre 0.0 y 1.0</string>

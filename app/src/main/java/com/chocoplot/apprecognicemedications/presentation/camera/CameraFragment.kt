@@ -26,12 +26,15 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.fragment.app.activityViewModels
 import androidx.navigation.fragment.findNavController
 import com.chocoplot.apprecognicemedications.R
 import com.chocoplot.apprecognicemedications.databinding.FragmentCameraBinding
 import com.chocoplot.apprecognicemedications.ml.Detector
 import com.chocoplot.apprecognicemedications.ml.model.BoundingBox
 import com.chocoplot.apprecognicemedications.core.CrashRecoveryManager
+import com.chocoplot.apprecognicemedications.data.SettingsRepository
+import com.chocoplot.apprecognicemedications.presentation.settings.SettingsViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -43,6 +46,8 @@ class CameraFragment : Fragment(), Detector.DetectorListener {
     private val binding get() = _binding!!
 
     private val viewModel: CameraViewModel by viewModels()
+    private val settingsViewModel: SettingsViewModel by activityViewModels()
+    private lateinit var settingsRepository: SettingsRepository
 
     private var detector: Detector? = null
     private var cameraExecutor: ExecutorService? = null
@@ -59,10 +64,15 @@ class CameraFragment : Fragment(), Detector.DetectorListener {
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentCameraBinding.inflate(inflater, container, false)
+        binding.viewModel = settingsViewModel
+        binding.lifecycleOwner = this
         return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        // Initialize settings repository
+        settingsRepository = SettingsRepository(requireContext())
+        
         // Initialize executor with proper thread naming and error handling
         cameraExecutor = Executors.newSingleThreadExecutor { r ->
             Thread(r, "CameraAnalysis").apply {
@@ -112,6 +122,31 @@ class CameraFragment : Fragment(), Detector.DetectorListener {
                 binding.overlay.invalidate()
             }
         }
+        
+        // Observe settings changes for dynamic updates
+        settingsViewModel.confidenceThreshold.observe(viewLifecycleOwner) { threshold ->
+            // Settings updated - data binding will handle UI updates automatically
+            // You can also pass these values to the detector if needed
+        }
+        
+        settingsViewModel.iouThreshold.observe(viewLifecycleOwner) { threshold ->
+            // Settings updated - data binding will handle UI updates automatically
+            // You can also pass these values to the detector if needed
+        }
+        
+        // Observe display elements visibility setting
+        settingsViewModel.displayElementsVisible.observe(viewLifecycleOwner) { isVisible ->
+            updateElementsVisibility(isVisible)
+        }
+        
+        // Load and apply initial display settings
+        val displayVisible = settingsRepository.getDisplayElementsVisible()
+        settingsViewModel.setDisplayElementsVisible(displayVisible)
+    }
+    
+    private fun updateElementsVisibility(isVisible: Boolean) {
+        binding.settingsDisplay.visibility = if (isVisible) View.VISIBLE else View.GONE
+        binding.inferenceTime.visibility = if (isVisible) View.VISIBLE else View.GONE
     }
 
     private fun hasCameraPermission(): Boolean =

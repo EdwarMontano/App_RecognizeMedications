@@ -6,15 +6,20 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.activityViewModels
+import androidx.lifecycle.Observer
 import com.chocoplot.apprecognicemedications.R
 import com.chocoplot.apprecognicemedications.data.SettingsRepository
 import com.chocoplot.apprecognicemedications.databinding.FragmentSettingsBinding
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class SettingsFragment : Fragment() {
     
     private var _binding: FragmentSettingsBinding? = null
     private val binding get() = _binding!!
     
+    private val settingsViewModel: SettingsViewModel by activityViewModels()
     private lateinit var settingsRepository: SettingsRepository
     
     override fun onCreateView(
@@ -23,6 +28,8 @@ class SettingsFragment : Fragment() {
         savedInstanceState: Bundle?
     ): View {
         _binding = FragmentSettingsBinding.inflate(inflater, container, false)
+        binding.viewModel = settingsViewModel
+        binding.lifecycleOwner = this
         return binding.root
     }
     
@@ -33,14 +40,18 @@ class SettingsFragment : Fragment() {
         
         loadCurrentSettings()
         setupSaveButton()
+        observeViewModelChanges()
     }
     
     private fun loadCurrentSettings() {
         val currentConfidence = settingsRepository.getConfidenceThreshold()
         val currentIou = settingsRepository.getIouThreshold()
+        val currentDisplayVisible = settingsRepository.getDisplayElementsVisible()
         
-        binding.confidenceEditText.setText(currentConfidence.toString())
-        binding.iouEditText.setText(currentIou.toString())
+        // Update ViewModel with current values from repository
+        settingsViewModel.setConfidenceThreshold(currentConfidence)
+        settingsViewModel.setIouThreshold(currentIou)
+        settingsViewModel.setDisplayElementsVisible(currentDisplayVisible)
     }
     
     private fun setupSaveButton() {
@@ -49,28 +60,54 @@ class SettingsFragment : Fragment() {
         }
     }
     
-    private fun saveSettings() {
-        val confidenceText = binding.confidenceEditText.text.toString().trim()
-        val iouText = binding.iouEditText.text.toString().trim()
+    private fun observeViewModelChanges() {
+        // Add text watchers to update ViewModel when user types
+        binding.confidenceEditText.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                s?.toString()?.let { text ->
+                    settingsViewModel.updateConfidenceFromText(text)
+                }
+            }
+        })
         
-        if (confidenceText.isEmpty() || iouText.isEmpty()) {
+        binding.iouEditText.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                s?.toString()?.let { text ->
+                    settingsViewModel.updateIouFromText(text)
+                }
+            }
+        })
+        
+        // Observe changes to update UI if needed
+        settingsViewModel.confidenceThreshold.observe(viewLifecycleOwner, Observer { value ->
+            // Data binding handles UI updates automatically
+        })
+        
+        settingsViewModel.iouThreshold.observe(viewLifecycleOwner, Observer { value ->
+            // Data binding handles UI updates automatically
+        })
+    }
+    
+    private fun saveSettings() {
+        val confidenceValue = settingsViewModel.getConfidenceThresholdValue()
+        val iouValue = settingsViewModel.getIouThresholdValue()
+        val displayVisibleValue = settingsViewModel.getDisplayElementsVisibleValue()
+        
+        if (!isValidThreshold(confidenceValue) || !isValidThreshold(iouValue)) {
             showError(getString(R.string.error_invalid_value))
             return
         }
         
         try {
-            val confidenceValue = confidenceText.toFloat()
-            val iouValue = iouText.toFloat()
-            
-            if (!isValidThreshold(confidenceValue) || !isValidThreshold(iouValue)) {
-                showError(getString(R.string.error_invalid_value))
-                return
-            }
-            
-            settingsRepository.saveSettings(confidenceValue, iouValue)
+            // Save to repository for persistence
+            settingsRepository.saveSettings(confidenceValue, iouValue, displayVisibleValue)
             showSuccess(getString(R.string.settings_saved))
             
-        } catch (e: NumberFormatException) {
+        } catch (e: Exception) {
             showError(getString(R.string.error_invalid_value))
         }
     }
