@@ -52,4 +52,31 @@
     <string name="session_photos_label">Fotos sesión:</string>
     <string name="total_photos_label">Total galería:</string>
     <string name="photos_count_format">%1$d</string>
+    
+    <!-- Gallery -->
+    <string name="gallery_title">Galería de Fotos</string>
+    <string name="select_multiple">Seleccionar múltiples</string>
+    <string name="delete_all">Vaciar galería</string>
+    <string name="cancel_selection">Cancelar selección</string>
+    <string name="delete_selected">Eliminar seleccionadas</string>
+    <string name="selected_count">%1$d seleccionadas</string>
+    <string name="confirm_delete_selected_title">Confirmar eliminación</string>
+    <string name="confirm_delete_selected_message">¿Está seguro de que desea eliminar las %1$d fotos seleccionadas? Esta acción no se puede deshacer.</string>
+    <string name="confirm_delete_all_title">Vaciar galería completa</string>
+    <string name="confirm_delete_all_message">¿Está seguro de que desea eliminar TODAS las fotos de la galería? Esta acción es irreversible y eliminará permanentemente todas las imágenes guardadas.</string>
+    <string name="delete">Eliminar</string>
+    <string name="cancel">Cancelar</string>
+    <string name="deleting">Eliminando...</string>
+    <string name="photos_deleted_successfully">Fotos eliminadas exitosamente</string>
+    <string name="gallery_cleared_successfully">Galería vaciada exitosamente</string>
+    <string name="error_deleting_photos">Error al eliminar las fotos</string>
+    <string name="no_photos_selected">No hay fotos seleccionadas</string>
+    <string name="empty_gallery_message">No hay fotos para eliminar</string>
+    
+    <!-- Content descriptions for accessibility -->
+    <string name="content_desc_select_multiple">Seleccionar múltiples fotos</string>
+    <string name="content_desc_delete_all">Vaciar toda la galería</string>
+    <string name="content_desc_selection_checkbox">Casilla de selección de foto</string>
+    <string name="content_desc_selected_photo">Foto seleccionada</string>
+    <string name="content_desc_unselected_photo">Foto no seleccionada</string>
 </resources>
