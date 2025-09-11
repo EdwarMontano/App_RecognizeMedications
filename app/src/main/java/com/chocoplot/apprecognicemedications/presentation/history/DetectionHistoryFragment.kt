@@ -17,15 +17,19 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.bumptech.glide.Glide
+import com.chocoplot.apprecognicemedications.core.Constants
+import com.chocoplot.apprecognicemedications.core.CrashRecoveryManager
 import com.chocoplot.apprecognicemedications.data.DetectionDatabase
 import com.chocoplot.apprecognicemedications.data.DetectionSession
 import com.chocoplot.apprecognicemedications.databinding.FragmentDetectionHistoryBinding
 import com.chocoplot.apprecognicemedications.ml.Detector
-import com.chocoplot.apprecognicemedications.core.Constants
 import com.chocoplot.apprecognicemedications.ml.model.BoundingBox
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeoutOrNull
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -228,7 +232,7 @@ class DetectionHistoryFragment : Fragment() {
     }
     
     /**
-     * Build a comprehensive summary report
+     * Build a comprehensive summary report with processing time information
      */
     private suspend fun buildSummaryReport(sessions: List<DetectionSession>, db: DetectionDatabase): String {
         val report = StringBuilder()
@@ -240,11 +244,19 @@ class DetectionHistoryFragment : Fragment() {
         report.append("Total de sesiones: ${sessions.size}\n\n")
         
         var totalDetections = 0
+        var totalProcessingTime = 0L
+        var sessionsWithTiming = 0
         val medicationCounts = mutableMapOf<String, Int>()
         
         for (session in sessions) {
             val detectionItems = db.getDetectionItems(session.id)
             totalDetections += detectionItems.size
+            
+            // Track processing time if available
+            if (session.processingTimeMs > 0) {
+                totalProcessingTime += session.processingTimeMs
+                sessionsWithTiming++
+            }
             
             detectionItems.forEach { item ->
                 val medicationName = item.className.trim().uppercase()
@@ -254,7 +266,16 @@ class DetectionHistoryFragment : Fragment() {
         
         report.append("RESUMEN GENERAL:\n")
         report.append("- Total detecciones: $totalDetections\n")
-        report.append("- Medicamentos únicos: ${medicationCounts.size}\n\n")
+        report.append("- Medicamentos únicos: ${medicationCounts.size}\n")
+        
+        // Add processing time information
+        if (sessionsWithTiming > 0) {
+            val avgProcessingTime = totalProcessingTime / sessionsWithTiming
+            report.append("- Tiempo total de procesamiento: ${totalProcessingTime / 1000.0} segundos\n")
+            report.append("- Tiempo promedio por foto: ${avgProcessingTime}ms\n")
+            report.append("- Sesiones con datos de tiempo: $sessionsWithTiming\n")
+        }
+        report.append("\n")
         
         if (medicationCounts.isNotEmpty()) {
             report.append("MEDICAMENTOS DETECTADOS:\n")
@@ -264,12 +285,27 @@ class DetectionHistoryFragment : Fragment() {
             report.append("\n")
         }
         
+        report.append("ESTADÍSTICAS DE RENDIMIENTO:\n")
+        if (sessionsWithTiming > 0) {
+            val fastSessions = sessions.filter { it.processingTimeMs > 0 && it.processingTimeMs < 1000 }.size
+            val mediumSessions = sessions.filter { it.processingTimeMs >= 1000 && it.processingTimeMs < 3000 }.size
+            val slowSessions = sessions.filter { it.processingTimeMs >= 3000 }.size
+            
+            report.append("- Procesamiento rápido (<1s): $fastSessions sesiones\n")
+            report.append("- Procesamiento medio (1-3s): $mediumSessions sesiones\n")
+            report.append("- Procesamiento lento (>3s): $slowSessions sesiones\n\n")
+        }
+        
         report.append("DETALLE POR SESIÓN:\n")
         sessions.forEachIndexed { index, session ->
             val detectionItems = db.getDetectionItems(session.id)
             report.append("${index + 1}. ${dateFormat.format(Date(session.timestamp))}\n")
             report.append("   Foto: ${session.photoUri}\n")
             report.append("   Detecciones: ${detectionItems.size}\n")
+            
+            if (session.processingTimeMs > 0) {
+                report.append("   Tiempo de procesamiento: ${session.processingTimeMs}ms\n")
+            }
             
             if (detectionItems.isNotEmpty()) {
                 val sessionMedications = detectionItems.groupBy { it.className.trim().uppercase() }
@@ -318,56 +354,58 @@ class DetectionHistoryFragment : Fragment() {
     }
     
     /**
-     * Start batch detection process on app gallery photos
+     * Start batch detection process on app gallery photos with sequential processing
      */
     private fun startBatchDetection() {
-        lifecycleScope.launch(Dispatchers.IO) {
+        lifecycleScope.launch(Dispatchers.Main) {
+            val startTime = System.currentTimeMillis()
+            var totalProcessingTime = 0L
+            
             try {
                 val photos = getAppGalleryPhotos()
                 
                 if (photos.isEmpty()) {
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(requireContext(), "No se encontraron fotos tomadas con la app", Toast.LENGTH_SHORT).show()
-                    }
+                    Toast.makeText(requireContext(), "No se encontraron fotos tomadas con la app", Toast.LENGTH_SHORT).show()
                     return@launch
                 }
                 
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(requireContext(), "Procesando ${photos.size} fotos...", Toast.LENGTH_SHORT).show()
-                }
+                // Show progress bar and disable buttons
+                binding.progressBar.visibility = View.VISIBLE
+                binding.btnDetectAllPhotos.isEnabled = false
+                binding.btnClearHistory.isEnabled = false
+                binding.btnGenerateReport.isEnabled = false
                 
-                // Initialize detector
-                val detector = Detector(requireContext(), Constants.MODEL_PATH, Constants.LABELS_PATH, object : Detector.DetectorListener {
-                    override fun onEmptyDetect() {
-                        // Handle empty detection
-                    }
-                    
-                    override fun onDetect(boundingBoxes: List<BoundingBox>, inferenceTime: Long) {
-                        // Handle detection results
-                    }
-                })
-                detector.setup()
+                Toast.makeText(requireContext(), "Iniciando procesamiento de ${photos.size} fotos...", Toast.LENGTH_SHORT).show()
                 
                 val db = DetectionDatabase(requireContext())
                 var processedCount = 0
                 var successCount = 0
                 var errorCount = 0
+                var totalDetections = 0
                 
-                for (photo in photos) {
+                // Process photos sequentially
+                for ((index, photo) in photos.withIndex()) {
+                    val photoStartTime = System.currentTimeMillis()
+                    
                     try {
-                        withContext(Dispatchers.Main) {
-                            Toast.makeText(requireContext(),
-                                "Procesando foto ${processedCount + 1}/${photos.size}...",
-                                Toast.LENGTH_SHORT).show()
+                        // Update progress dynamically
+                        val progressPercentage = ((index.toFloat() / photos.size) * 100).toInt()
+                        binding.toolbar.title = "Procesando: ${index + 1}/${photos.size} ($progressPercentage%)"
+                        
+                        Log.d(TAG, "Processing photo ${index + 1}/${photos.size}: $photo")
+                        
+                        // Process each photo individually using the same approach as PhotoDetailFragment
+                        val detections = withContext(Dispatchers.IO) {
+                            processPhotoForBatch(photo)
                         }
                         
-                        // Load bitmap from URI
-                        val bitmap = loadBitmapFromUri(photo)
+                        val photoProcessingTime = System.currentTimeMillis() - photoStartTime
+                        totalProcessingTime += photoProcessingTime
                         
-                        if (bitmap != null) {
-                            // Perform detection synchronously
-                            val detections = performSyncDetection(detector, bitmap)
-                            
+                        Log.d(TAG, "Photo ${index + 1} completed with ${detections.size} detections in ${photoProcessingTime}ms")
+                        
+                        // Save results to database
+                        withContext(Dispatchers.IO) {
                             // Check if detection already exists and delete it
                             val existingSession = db.findSessionByPhotoUri(photo)
                             if (existingSession != null) {
@@ -376,50 +414,70 @@ class DetectionHistoryFragment : Fragment() {
                             }
                             
                             // Save detection results (including empty detections)
-                            val sessionId = db.saveDetectionSession(photo, detections)
+                            val sessionId = db.saveDetectionSessionWithTiming(photo, detections, photoProcessingTime)
                             
                             if (sessionId != -1L) {
                                 successCount++
-                                Log.d(TAG, "Successfully processed photo: $photo with ${detections.size} detections")
+                                totalDetections += detections.size
+                                Log.d(TAG, "Successfully saved photo: $photo with ${detections.size} detections")
                             } else {
                                 errorCount++
                                 Log.e(TAG, "Failed to save detection session for photo: $photo")
                             }
-                        } else {
-                            errorCount++
-                            Log.e(TAG, "Failed to load bitmap for photo: $photo")
                         }
                         
                         processedCount++
+                        
+                        // Update UI progressively (every 3 photos or at the end)
+                        if (index % 3 == 0 || index == photos.size - 1) {
+                            loadDetectionHistory()
+                        }
                         
                     } catch (e: Exception) {
                         Log.e(TAG, "Error processing photo: $photo", e)
                         errorCount++
                         processedCount++
+                        totalProcessingTime += (System.currentTimeMillis() - photoStartTime)
                     }
                 }
                 
-                // Clean up detector
-                detector.clear()
+                val totalTime = System.currentTimeMillis() - startTime
                 
-                withContext(Dispatchers.Main) {
-                    val message = if (errorCount == 0) {
-                        "Procesamiento completado exitosamente.\n$successCount fotos procesadas."
-                    } else {
-                        "Procesamiento completado.\n$successCount exitosas, $errorCount errores."
-                    }
-                    
-                    Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
-                    
-                    // Reload detection history to show new results
-                    loadDetectionHistory()
+                // Reset UI
+                binding.progressBar.visibility = View.GONE
+                binding.btnDetectAllPhotos.isEnabled = true
+                binding.btnClearHistory.isEnabled = true
+                binding.btnGenerateReport.isEnabled = true
+                binding.toolbar.title = "Historial de Detecciones"
+                
+                val message = if (errorCount == 0) {
+                    "✅ Procesamiento completado exitosamente!\n" +
+                    "📊 $successCount fotos procesadas\n" +
+                    "🔍 $totalDetections medicamentos detectados\n" +
+                    "⏱️ Tiempo total: ${totalTime / 1000}s\n" +
+                    "⚡ Tiempo promedio: ${if (photos.isNotEmpty()) totalProcessingTime / photos.size else 0}ms por foto"
+                } else {
+                    "⚠️ Procesamiento completado con errores\n" +
+                    "✅ $successCount exitosas\n" +
+                    "❌ $errorCount errores\n" +
+                    "🔍 $totalDetections medicamentos detectados\n" +
+                    "⏱️ Tiempo total: ${totalTime / 1000}s"
                 }
+                
+                Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
+                
+                // Final reload of detection history
+                loadDetectionHistory()
                 
             } catch (e: Exception) {
                 Log.e(TAG, "Error in batch detection", e)
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(requireContext(), "Error al procesar las fotos: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
-                }
+                binding.progressBar.visibility = View.GONE
+                binding.btnDetectAllPhotos.isEnabled = true
+                binding.btnClearHistory.isEnabled = true
+                binding.btnGenerateReport.isEnabled = true
+                binding.toolbar.title = "Historial de Detecciones"
+                
+                Toast.makeText(requireContext(), "Error al procesar las fotos: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -521,43 +579,75 @@ class DetectionHistoryFragment : Fragment() {
     }
     
     /**
-     * Perform synchronous detection on a bitmap
+     * Process a single photo for batch detection using same logic as manuallyProcessCurrentPhoto
      */
-    private suspend fun performSyncDetection(detector: Detector, bitmap: Bitmap): List<BoundingBox> {
+    private suspend fun processPhotoForBatch(photoUri: Uri): List<BoundingBox> {
         return withContext(Dispatchers.IO) {
             try {
-                // Create a simple synchronous detection wrapper
-                var detectionResult: List<BoundingBox> = emptyList()
-                var isDetectionComplete = false
-                
-                // Create temporary detector listener
-                val tempDetector = Detector(requireContext(), Constants.MODEL_PATH, Constants.LABELS_PATH, object : Detector.DetectorListener {
+                Log.d(TAG, "Processing photo for batch: $photoUri")
+
+                // Reset crash recovery before manual-style processing (exactly like PhotoDetailFragment)
+                CrashRecoveryManager.resetRecoveryMode()
+
+                // Use Glide to decode full bitmap preserving aspect ratio (like PhotoDetailFragment)
+                val futureTarget = Glide.with(requireContext())
+                    .asBitmap()
+                    .load(photoUri)
+                    .submit()
+
+                val bitmap = futureTarget.get()
+                if (bitmap == null) {
+                    Log.e(TAG, "Failed to load bitmap from URI: $photoUri")
+                    return@withContext emptyList()
+                }
+
+                Log.d(TAG, "Loaded bitmap via Glide: ${bitmap.width}x${bitmap.height}")
+
+                // Track processing time exactly like PhotoDetailFragment
+                val startTime = System.currentTimeMillis()
+                val deferred = CompletableDeferred<List<BoundingBox>>()
+
+                val detector = Detector(requireContext(), Constants.MODEL_PATH, Constants.LABELS_PATH, object : Detector.DetectorListener {
                     override fun onEmptyDetect() {
-                        detectionResult = emptyList()
-                        isDetectionComplete = true
+                        Log.d(TAG, "Batch: No medications in $photoUri")
+                        deferred.complete(emptyList())
                     }
-                    
+
                     override fun onDetect(boundingBoxes: List<BoundingBox>, inferenceTime: Long) {
-                        detectionResult = boundingBoxes
-                        isDetectionComplete = true
+                        Log.d(TAG, "Batch: Found ${boundingBoxes.size} medications in $photoUri (${inferenceTime}ms)")
+                        boundingBoxes.forEach { box ->
+                            Log.d(TAG, "  - ${box.clsName}: ${box.cnf}")
+                        }
+                        deferred.complete(boundingBoxes)
                     }
                 })
-                
-                tempDetector.setup()
-                tempDetector.detect(bitmap)
-                
-                // Wait for detection to complete (simple busy wait)
-                var waitTime = 0
-                while (!isDetectionComplete && waitTime < 10000) { // Max 10 seconds wait
-                    Thread.sleep(100)
-                    waitTime += 100
+
+                detector.setup()
+                detector.detect(bitmap)
+
+                val result = withTimeoutOrNull(15000L) { deferred.await() } ?: emptyList()
+                val processingTime = System.currentTimeMillis() - startTime
+
+                // Save results to DB exactly like PhotoDetailFragment.saveResultsToDatabase
+                val db = DetectionDatabase(requireContext())
+                val existing = db.findSessionByPhotoUri(photoUri)
+                if (existing != null) {
+                    Log.d(TAG, "Replacing existing detection for photo: ${existing.id}")
+                    db.deleteDetectionSession(existing.id)
                 }
                 
-                tempDetector.clear()
+                val sessionId = db.saveDetectionSessionWithTiming(photoUri, result, processingTime)
+                Log.d(TAG, "Saved batch detection with ID: $sessionId and ${result.size} detections")
+
+                // Clean up
+                detector.clear()
+                bitmap.recycle()
                 
-                detectionResult
+                Log.d(TAG, "Batch processing completed for $photoUri: ${result.size} detections in ${processingTime}ms")
+                result
+                
             } catch (e: Exception) {
-                Log.e(TAG, "Error in sync detection", e)
+                Log.e(TAG, "Error processing photo for batch: $photoUri", e)
                 emptyList()
             }
         }

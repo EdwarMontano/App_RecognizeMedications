@@ -20,7 +20,7 @@ class DetectionDatabase(context: Context) :
     companion object {
         private const val TAG = "DetectionDatabase"
         private const val DATABASE_NAME = "medication_detections.db"
-        private const val DATABASE_VERSION = 1
+        private const val DATABASE_VERSION = 2
         
         // Tables
         private const val TABLE_DETECTION_SESSIONS = "detection_sessions"
@@ -31,6 +31,7 @@ class DetectionDatabase(context: Context) :
         private const val COLUMN_SESSION_PHOTO_URI = "photo_uri"
         private const val COLUMN_SESSION_TIMESTAMP = "timestamp"
         private const val COLUMN_SESSION_TOTAL_ITEMS = "total_items"
+        private const val COLUMN_SESSION_PROCESSING_TIME = "processing_time"
         
         // Item columns
         private const val COLUMN_ITEM_ID = "id"
@@ -49,7 +50,8 @@ class DetectionDatabase(context: Context) :
                 $COLUMN_SESSION_ID INTEGER PRIMARY KEY AUTOINCREMENT,
                 $COLUMN_SESSION_PHOTO_URI TEXT NOT NULL,
                 $COLUMN_SESSION_TIMESTAMP TEXT NOT NULL,
-                $COLUMN_SESSION_TOTAL_ITEMS INTEGER NOT NULL
+                $COLUMN_SESSION_TOTAL_ITEMS INTEGER NOT NULL,
+                $COLUMN_SESSION_PROCESSING_TIME INTEGER DEFAULT 0
             )
         """.trimIndent()
         
@@ -76,9 +78,17 @@ class DetectionDatabase(context: Context) :
     
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         // Handle database migrations here in future versions
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_DETECTED_ITEMS")
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_DETECTION_SESSIONS")
-        onCreate(db)
+        if (oldVersion < 2) {
+            // Add processing_time column if upgrading from version 1
+            try {
+                db.execSQL("ALTER TABLE $TABLE_DETECTION_SESSIONS ADD COLUMN $COLUMN_SESSION_PROCESSING_TIME INTEGER DEFAULT 0")
+            } catch (e: Exception) {
+                // Column might already exist, or we need to recreate the table
+                db.execSQL("DROP TABLE IF EXISTS $TABLE_DETECTED_ITEMS")
+                db.execSQL("DROP TABLE IF EXISTS $TABLE_DETECTION_SESSIONS")
+                onCreate(db)
+            }
+        }
     }
     
     /**
@@ -136,6 +146,61 @@ class DetectionDatabase(context: Context) :
     }
     
     /**
+     * Saves a new detection session with processing time information
+     * @return The ID of the newly created session, or -1 if the operation failed
+     */
+    fun saveDetectionSessionWithTiming(photoUri: Uri, detections: List<BoundingBox>, processingTimeMs: Long): Long {
+        Log.d(TAG, "Saving detection session with ${detections.size} items and ${processingTimeMs}ms processing time")
+        
+        val db = writableDatabase
+        var sessionId: Long = -1
+        
+        try {
+            db.beginTransaction()
+            
+            // Create session record with processing time
+            val timestamp = System.currentTimeMillis()
+            val sessionValues = ContentValues().apply {
+                put(COLUMN_SESSION_PHOTO_URI, photoUri.toString())
+                put(COLUMN_SESSION_TIMESTAMP, timestamp)
+                put(COLUMN_SESSION_TOTAL_ITEMS, detections.size)
+                put(COLUMN_SESSION_PROCESSING_TIME, processingTimeMs)
+            }
+            
+            sessionId = db.insert(TABLE_DETECTION_SESSIONS, null, sessionValues)
+            
+            // Insert detection items
+            if (sessionId != -1L) {
+                for (detection in detections) {
+                    val itemValues = ContentValues().apply {
+                        put(COLUMN_ITEM_SESSION_ID, sessionId)
+                        put(COLUMN_ITEM_CLASS_NAME, detection.clsName)
+                        put(COLUMN_ITEM_CONFIDENCE, detection.cnf)
+                        put(COLUMN_ITEM_X1, detection.x1)
+                        put(COLUMN_ITEM_Y1, detection.y1)
+                        put(COLUMN_ITEM_X2, detection.x2)
+                        put(COLUMN_ITEM_Y2, detection.y2)
+                    }
+                    
+                    val itemId = db.insert(TABLE_DETECTED_ITEMS, null, itemValues)
+                    if (itemId == -1L) {
+                        Log.e(TAG, "Failed to insert detection item for session $sessionId")
+                    }
+                }
+            }
+            
+            db.setTransactionSuccessful()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving detection session with timing", e)
+            sessionId = -1L
+        } finally {
+            db.endTransaction()
+        }
+        
+        return sessionId
+    }
+    
+    /**
      * Gets all detection sessions in descending order by timestamp
      */
     fun getAllDetectionSessions(): List<DetectionSession> {
@@ -153,13 +218,19 @@ class DetectionDatabase(context: Context) :
                 val photoUriStr = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_SESSION_PHOTO_URI))
                 val timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_SESSION_TIMESTAMP))
                 val totalItems = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_SESSION_TOTAL_ITEMS))
+                val processingTime = try {
+                    cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_SESSION_PROCESSING_TIME))
+                } catch (e: Exception) {
+                    0L // Default for older database versions
+                }
                 
                 sessions.add(
                     DetectionSession(
                         id = id,
                         photoUri = Uri.parse(photoUriStr),
                         timestamp = timestamp,
-                        totalItems = totalItems
+                        totalItems = totalItems,
+                        processingTimeMs = processingTime
                     )
                 )
             }
@@ -188,12 +259,18 @@ class DetectionDatabase(context: Context) :
                 val photoUriStr = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_SESSION_PHOTO_URI))
                 val timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_SESSION_TIMESTAMP))
                 val totalItems = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_SESSION_TOTAL_ITEMS))
+                val processingTime = try {
+                    cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_SESSION_PROCESSING_TIME))
+                } catch (e: Exception) {
+                    0L // Default for older database versions
+                }
                 
                 return DetectionSession(
                     id = id,
                     photoUri = Uri.parse(photoUriStr),
                     timestamp = timestamp,
-                    totalItems = totalItems
+                    totalItems = totalItems,
+                    processingTimeMs = processingTime
                 )
             }
         }
@@ -316,7 +393,8 @@ data class DetectionSession(
     val id: Long,
     val photoUri: Uri,
     val timestamp: Long,
-    val totalItems: Int
+    val totalItems: Int,
+    val processingTimeMs: Long = 0L
 )
 
 /**

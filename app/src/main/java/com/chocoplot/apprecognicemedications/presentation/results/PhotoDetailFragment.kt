@@ -52,6 +52,9 @@ class PhotoDetailFragment : Fragment(), Detector.DetectorListener {
     private lateinit var detector: Detector
     private lateinit var medicationAdapter: MedicationCountAdapter
     
+    // Processing time tracking
+    private var detectionStartTime: Long = 0L
+    
     // TODO: Add navigation args when implementing navigation
     // private val args: PhotoDetailFragmentArgs by navArgs()
 
@@ -286,7 +289,12 @@ class PhotoDetailFragment : Fragment(), Detector.DetectorListener {
                             CrashRecoveryManager.resetRecoveryMode()
                             Log.d("PhotoDetailFragment", "Recovery mode reset for manual detection")
                             
+                            // Store start time for processing time tracking
                             val startTime = System.currentTimeMillis()
+                            
+                            // Store start time in a property to use in onDetect callback
+                            detectionStartTime = startTime
+                            
                             detector.detect(resource)
                             // Inference time will be handled in onDetect callback
                         } catch (e: Exception) {
@@ -316,10 +324,10 @@ class PhotoDetailFragment : Fragment(), Detector.DetectorListener {
    }
     
     /**
-    * Save detection results to SQLite database
+    * Save detection results to SQLite database with processing time
     * If a detection already exists for this photo, it will be replaced
     */
-   private suspend fun saveResultsToDatabase(photoUri: Uri, detections: List<BoundingBox>) {
+   private suspend fun saveResultsToDatabase(photoUri: Uri, detections: List<BoundingBox>, processingTimeMs: Long = 0L) {
         return withContext(Dispatchers.IO) {
             try {
                 val db = DetectionDatabase(requireContext())
@@ -333,13 +341,23 @@ class PhotoDetailFragment : Fragment(), Detector.DetectorListener {
                     db.deleteDetectionSession(existingSession.id)
                 }
                 
-                // Save the new detection
-                val sessionId = db.saveDetectionSession(photoUri, detections)
+                // Save the new detection with timing if available
+                val sessionId = if (processingTimeMs > 0) {
+                    db.saveDetectionSessionWithTiming(photoUri, detections, processingTimeMs)
+                } else {
+                    db.saveDetectionSession(photoUri, detections)
+                }
                 
                 withContext(Dispatchers.Main) {
                     if (sessionId != -1L) {
+                        val message = if (existingSession != null) {
+                            "Detección actualizada"
+                        } else {
+                            "Resultados guardados en base de datos"
+                        }
+                        val timeInfo = if (processingTimeMs > 0) " (${processingTimeMs}ms)" else ""
                         Toast.makeText(requireContext(),
-                            if (existingSession != null) "Detección actualizada" else "Resultados guardados en base de datos",
+                            message + timeInfo,
                             Toast.LENGTH_SHORT).show()
                     } else {
                         Toast.makeText(requireContext(),
@@ -382,7 +400,10 @@ class PhotoDetailFragment : Fragment(), Detector.DetectorListener {
             val photoUri = photoUriString?.let { Uri.parse(it) }
             photoUri?.let { uri ->
                 lifecycleScope.launch(Dispatchers.IO) {
-                    saveResultsToDatabase(uri, emptyList()) // Save with 0 detections
+                    val processingTime = if (detectionStartTime > 0) {
+                        System.currentTimeMillis() - detectionStartTime
+                    } else 0L
+                    saveResultsToDatabase(uri, emptyList(), processingTime) // Save with 0 detections and timing
                 }
             }
             
@@ -413,7 +434,10 @@ class PhotoDetailFragment : Fragment(), Detector.DetectorListener {
             val photoUri = photoUriString?.let { Uri.parse(it) }
             photoUri?.let { uri ->
                 lifecycleScope.launch(Dispatchers.IO) {
-                    saveResultsToDatabase(uri, boundingBoxes)
+                    val processingTime = if (detectionStartTime > 0) {
+                        System.currentTimeMillis() - detectionStartTime
+                    } else 0L
+                    saveResultsToDatabase(uri, boundingBoxes, processingTime)
                 }
             }
         }
