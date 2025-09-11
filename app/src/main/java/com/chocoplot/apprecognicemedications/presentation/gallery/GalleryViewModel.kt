@@ -24,7 +24,8 @@ import javax.inject.Inject
 data class GalleryPhoto(
     val uri: Uri,
     val dateAdded: Long,
-    val displayName: String
+    val displayName: String,
+    var isSelected: Boolean = false
 )
 
 @HiltViewModel
@@ -50,6 +51,30 @@ class GalleryViewModel @Inject constructor() : ViewModel(), Detector.DetectorLis
 
     private val _imageSize = MutableLiveData<Pair<Int, Int>?>()
     val imageSize: LiveData<Pair<Int, Int>?> = _imageSize
+
+    // Selection mode properties
+    private val _isSelectionMode = MutableLiveData(false)
+    val isSelectionMode: LiveData<Boolean> = _isSelectionMode
+
+    private val _selectedPhotos = MutableLiveData<Set<Uri>>(emptySet())
+    val selectedPhotos: LiveData<Set<Uri>> = _selectedPhotos
+
+    private val _selectedCount = MutableLiveData(0)
+    val selectedCount: LiveData<Int> = _selectedCount
+
+    // Operation states
+    private val _isOperationInProgress = MutableLiveData(false)
+    val isOperationInProgress: LiveData<Boolean> = _isOperationInProgress
+
+    private val _operationMessage = MutableLiveData<String>()
+    val operationMessage: LiveData<String> = _operationMessage
+
+    // Result messages
+    private val _showSuccessMessage = MutableLiveData<String?>()
+    val showSuccessMessage: LiveData<String?> = _showSuccessMessage
+
+    private val _showErrorMessage = MutableLiveData<String?>()
+    val showErrorMessage: LiveData<String?> = _showErrorMessage
 
     private var detector: Detector? = null
 
@@ -211,6 +236,185 @@ class GalleryViewModel @Inject constructor() : ViewModel(), Detector.DetectorLis
                 onEmptyDetect()
             }
         }
+    }
+
+    // Selection mode functions
+    fun toggleSelectionMode() {
+        val currentMode = _isSelectionMode.value ?: false
+        Log.d("GalleryViewModel", "Toggling selection mode from $currentMode to ${!currentMode}")
+        _isSelectionMode.value = !currentMode
+        
+        if (!currentMode) {
+            // Entering selection mode - clear any previous selections
+            Log.d("GalleryViewModel", "Entering selection mode")
+            clearAllSelections()
+        } else {
+            // Exiting selection mode - clear selections
+            Log.d("GalleryViewModel", "Exiting selection mode")
+            clearAllSelections()
+        }
+    }
+
+    fun exitSelectionMode() {
+        Log.d("GalleryViewModel", "Explicitly exiting selection mode")
+        _isSelectionMode.value = false
+        clearAllSelections()
+    }
+
+    fun togglePhotoSelection(photoUri: Uri) {
+        val currentSelections = _selectedPhotos.value ?: emptySet()
+        val newSelections = if (currentSelections.contains(photoUri)) {
+            currentSelections - photoUri
+        } else {
+            currentSelections + photoUri
+        }
+        
+        _selectedPhotos.value = newSelections
+        _selectedCount.value = newSelections.size
+        
+        // Update the photo selection state in the list
+        updatePhotoSelectionState(photoUri, newSelections.contains(photoUri))
+    }
+
+    private fun updatePhotoSelectionState(uri: Uri, isSelected: Boolean) {
+        val currentPhotos = _galleryPhotos.value ?: return
+        val updatedPhotos = currentPhotos.map { photo ->
+            if (photo.uri == uri) {
+                photo.copy(isSelected = isSelected)
+            } else {
+                photo
+            }
+        }
+        _galleryPhotos.value = updatedPhotos
+    }
+
+    private fun clearAllSelections() {
+        Log.d("GalleryViewModel", "Clearing all selections")
+        val currentPhotos = _galleryPhotos.value ?: return
+        val updatedPhotos = currentPhotos.map { it.copy(isSelected = false) }
+        _galleryPhotos.value = updatedPhotos
+        _selectedPhotos.value = emptySet()
+        _selectedCount.value = 0
+        Log.d("GalleryViewModel", "Selections cleared - count: ${_selectedCount.value}")
+    }
+
+    fun selectAllPhotos() {
+        val currentPhotos = _galleryPhotos.value ?: return
+        val allUris = currentPhotos.map { it.uri }.toSet()
+        val updatedPhotos = currentPhotos.map { it.copy(isSelected = true) }
+        
+        _galleryPhotos.value = updatedPhotos
+        _selectedPhotos.value = allUris
+        _selectedCount.value = allUris.size
+    }
+
+    // Deletion functions
+    fun deleteSelectedPhotos(context: Context) {
+        val selectedUris = _selectedPhotos.value ?: emptySet()
+        if (selectedUris.isEmpty()) {
+            _showErrorMessage.value = "No hay fotos seleccionadas"
+            return
+        }
+
+        viewModelScope.launch {
+            _isOperationInProgress.value = true
+            _operationMessage.value = "Eliminando fotos seleccionadas..."
+
+            try {
+                val deletedCount = withContext(Dispatchers.IO) {
+                    var count = 0
+                    selectedUris.forEach { uri ->
+                        try {
+                            val rowsDeleted = context.contentResolver.delete(uri, null, null)
+                            if (rowsDeleted > 0) count++
+                        } catch (e: Exception) {
+                            Log.e("GalleryViewModel", "Error deleting photo: $uri", e)
+                        }
+                    }
+                    count
+                }
+
+                if (deletedCount > 0) {
+                    _showSuccessMessage.value = "Se eliminaron $deletedCount fotos exitosamente"
+                    // Reload gallery to reflect changes
+                    loadGalleryPhotos(context)
+                    exitSelectionMode()
+                } else {
+                    _showErrorMessage.value = "No se pudieron eliminar las fotos"
+                }
+            } catch (e: Exception) {
+                Log.e("GalleryViewModel", "Error during deletion operation", e)
+                _showErrorMessage.value = "Error al eliminar las fotos: ${e.localizedMessage}"
+            } finally {
+                _isOperationInProgress.value = false
+                _operationMessage.value = ""
+            }
+        }
+    }
+
+    fun deleteAllPhotos(context: Context) {
+        val allPhotos = _galleryPhotos.value ?: emptyList()
+        if (allPhotos.isEmpty()) {
+            _showErrorMessage.value = "No hay fotos para eliminar"
+            return
+        }
+
+        viewModelScope.launch {
+            _isOperationInProgress.value = true
+            _operationMessage.value = "Vaciando galería..."
+
+            try {
+                val deletedCount = withContext(Dispatchers.IO) {
+                    var count = 0
+                    allPhotos.forEach { photo ->
+                        try {
+                            val rowsDeleted = context.contentResolver.delete(photo.uri, null, null)
+                            if (rowsDeleted > 0) count++
+                        } catch (e: Exception) {
+                            Log.e("GalleryViewModel", "Error deleting photo: ${photo.uri}", e)
+                        }
+                    }
+                    count
+                }
+
+                if (deletedCount > 0) {
+                    _showSuccessMessage.value = "Galería vaciada exitosamente. Se eliminaron $deletedCount fotos"
+                    // Reload gallery to reflect changes
+                    loadGalleryPhotos(context)
+                    exitSelectionMode()
+                } else {
+                    _showErrorMessage.value = "No se pudieron eliminar las fotos"
+                }
+            } catch (e: Exception) {
+                Log.e("GalleryViewModel", "Error during delete all operation", e)
+                _showErrorMessage.value = "Error al vaciar la galería: ${e.localizedMessage}"
+            } finally {
+                _isOperationInProgress.value = false
+                _operationMessage.value = ""
+            }
+        }
+    }
+
+    // UI State helper functions
+    fun hasSelectedPhotos(): Boolean {
+        return (_selectedCount.value ?: 0) > 0
+    }
+
+    fun hasPhotos(): Boolean {
+        return (_galleryPhotos.value?.size ?: 0) > 0
+    }
+
+    fun getSelectedPhotosCount(): Int {
+        return _selectedCount.value ?: 0
+    }
+
+    // Message clearing functions
+    fun clearSuccessMessage() {
+        _showSuccessMessage.value = null
+    }
+
+    fun clearErrorMessage() {
+        _showErrorMessage.value = null
     }
 
     private fun loadBitmapFromUri(context: Context, uri: Uri): Bitmap? {

@@ -3,6 +3,7 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/cardView"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_margin="4dp"
@@ -26,6 +27,36 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             tools:src="@drawable/logoapp" />
+
+        <!-- Selection overlay -->
+        <View
+            android:id="@+id/selectionOverlay"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:background="#80000000"
+            android:visibility="gone"
+            app:layout_constraintTop_toTopOf="@id/photoImageView"
+            app:layout_constraintBottom_toBottomOf="@id/photoImageView"
+            app:layout_constraintStart_toStartOf="@id/photoImageView"
+            app:layout_constraintEnd_toEndOf="@id/photoImageView"
+            tools:visibility="visible" />
+
+        <!-- Selection checkbox -->
+        <CheckBox
+            android:id="@+id/selectionCheckBox"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_margin="8dp"
+            android:visibility="gone"
+            android:button="@drawable/ic_check_circle_24"
+            android:background="@android:color/white"
+            android:padding="4dp"
+            app:buttonTint="?attr/colorPrimary"
+            app:layout_constraintTop_toTopOf="@id/photoImageView"
+            app:layout_constraintEnd_toEndOf="@id/photoImageView"
+            android:contentDescription="@string/content_desc_selection_checkbox"
+            tools:visibility="visible"
+            tools:checked="true" />
 
         <!-- Overlay gradient for text readability -->
         <View
@@ -51,7 +82,7 @@
             android:ellipsize="end"
             app:layout_constraintBottom_toBottomOf="@id/photoImageView"
             app:layout_constraintStart_toStartOf="@id/photoImageView"
-            app:layout_constraintEnd_toEndOf="@id/photoImageView"
+            app:layout_constraintEnd_toStartOf="@id/selectionCheckBox"
             tools:text="12/01/2024 15:30" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
