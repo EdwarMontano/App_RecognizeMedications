@@ -56,6 +56,9 @@ class GalleryAdapter(
                 .transition(DrawableTransitionOptions.withCrossFade())
                 .into(binding.photoImageView)
 
+            // Set photo ID number based on position
+            binding.photoIdTextView.text = "#${adapterPosition + 1}"
+
             // Format and display date
             val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
             binding.dateTextView.text = dateFormat.format(Date(photo.dateAdded * 1000))

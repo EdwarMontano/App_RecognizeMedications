@@ -173,35 +173,33 @@ class Detector(
     }
 
     fun detect(frame: Bitmap) {
+        // Quick check without synchronization to avoid blocking
+        if (!isInitialized || isProcessing) {
+            detectorListener.onEmptyDetect()
+            return
+        }
+        
+        // Quick memory and recovery checks
+        if (CrashRecoveryManager.isInRecoveryMode()) {
+            android.util.Log.w("Detector", "Skipping detection - in recovery mode")
+            detectorListener.onEmptyDetect()
+            return
+        }
+        
+        val memoryStatus = CrashRecoveryManager.checkMemoryPressure()
+        if (memoryStatus == CrashRecoveryManager.MemoryStatus.CRITICAL) {
+            android.util.Log.w("Detector", "Skipping detection - critical memory pressure")
+            CrashRecoveryManager.performRecoveryAction(CrashRecoveryManager.RecoveryAction.FORCE_GARBAGE_COLLECTION)
+            detectorListener.onEmptyDetect()
+            return
+        }
+        
+        // Atomic check and set for processing flag
         synchronized(detectorLock) {
-            // Check if detector is properly initialized and not already processing
-            if (!isInitialized || isProcessing) {
+            if (isProcessing || consecutiveOomErrors >= MAX_CONSECUTIVE_OOM_ERRORS) {
                 detectorListener.onEmptyDetect()
                 return
             }
-            
-            // Check recovery mode and memory pressure
-            if (CrashRecoveryManager.isInRecoveryMode()) {
-                android.util.Log.w("Detector", "Skipping detection - in recovery mode")
-                detectorListener.onEmptyDetect()
-                return
-            }
-            
-            val memoryStatus = CrashRecoveryManager.checkMemoryPressure()
-            if (memoryStatus == CrashRecoveryManager.MemoryStatus.CRITICAL) {
-                android.util.Log.w("Detector", "Skipping detection - critical memory pressure")
-                CrashRecoveryManager.performRecoveryAction(CrashRecoveryManager.RecoveryAction.FORCE_GARBAGE_COLLECTION)
-                detectorListener.onEmptyDetect()
-                return
-            }
-            
-            // Check if too many consecutive OOM errors
-            if (consecutiveOomErrors >= MAX_CONSECUTIVE_OOM_ERRORS) {
-                android.util.Log.e("Detector", "Too many consecutive OOM errors, skipping detection")
-                detectorListener.onEmptyDetect()
-                return
-            }
-            
             isProcessing = true
             totalInferences++
         }
@@ -310,20 +308,31 @@ class Detector(
                 return
             }
 
-            // Run inference with timeout protection
+            // Run inference with minimal synchronization
             try {
-                synchronized(currentInterpreter) {
-                    if (!isInitialized) {
-                        android.util.Log.w("Detector", "Detector was cleared during processing")
-                        return
+                if (!isInitialized) {
+                    android.util.Log.w("Detector", "Detector was cleared during processing")
+                    return
+                }
+                
+                output?.let { outputTensor ->
+                    // Use minimal synchronization scope
+                    val inferenceSuccess = synchronized(currentInterpreter) {
+                        try {
+                            currentInterpreter.run(imageBuffer, outputTensor.buffer)
+                            true
+                        } catch (e: Exception) {
+                            android.util.Log.e("Detector", "Error in inference execution", e)
+                            false
+                        }
                     }
                     
-                    output?.let { outputTensor ->
-                        currentInterpreter.run(imageBuffer, outputTensor.buffer)
-                    } ?: run {
-                        android.util.Log.e("Detector", "Output tensor is null")
+                    if (!inferenceSuccess) {
                         return
                     }
+                } ?: run {
+                    android.util.Log.e("Detector", "Output tensor is null")
+                    return
                 }
             } catch (e: IllegalArgumentException) {
                 android.util.Log.e("Detector", "Invalid input for inference", e)
@@ -371,10 +380,12 @@ class Detector(
             synchronized(detectorLock) { failedInferences++ }
             detectorListener.onEmptyDetect()
         } finally {
-            // Always reset processing flag
-            synchronized(detectorLock) { isProcessing = false }
+            // Always reset processing flag with minimal synchronization
+            synchronized(detectorLock) {
+                isProcessing = false
+            }
             
-            // Clean up all resources with enhanced error handling
+            // Clean up all resources asynchronously to avoid blocking
             try {
                 resizedBitmap?.let { bitmap ->
                     if (bitmap != frame && !bitmap.isRecycled) {

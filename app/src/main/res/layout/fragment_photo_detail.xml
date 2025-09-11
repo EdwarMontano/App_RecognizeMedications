@@ -25,9 +25,10 @@
         android:layout_height="0dp"
         android:scaleType="centerCrop"
         app:layout_constraintTop_toBottomOf="@id/toolbar"
-        app:layout_constraintBottom_toTopOf="@+id/summaryCard"
+        app:layout_constraintBottom_toTopOf="@+id/resultsContainer"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"/>
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintDimensionRatio="4:3"/>
 
     <com.chocoplot.apprecognicemedications.presentation.common.OverlayView
         android:id="@+id/overlay"
@@ -49,36 +50,93 @@
         app:layout_constraintStart_toStartOf="@id/photo"
         app:layout_constraintEnd_toEndOf="@id/photo" />
 
-    <com.google.android.material.card.MaterialCardView
-        android:id="@+id/summaryCard"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
+    <!-- Manual detection button -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/btnManualDetect"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:layout_margin="16dp"
-        app:cardElevation="4dp"
-        app:cardCornerRadius="8dp"
+        android:contentDescription="Detectar medicamentos manualmente"
+        app:layout_constraintBottom_toTopOf="@+id/resultsContainer"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:src="@drawable/ic_check_circle_24" />
+        
+    <!-- Inference time indicator -->
+    <TextView
+        android:id="@+id/inferenceTime"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:textColor="@android:color/white"
+        android:background="@drawable/bg_inference_chip"
+        android:padding="4dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="@id/photo"
+        app:layout_constraintEnd_toEndOf="@id/photo"
+        tools:text="250ms" />
+
+    <!-- Results Container -->
+    <LinearLayout
+        android:id="@+id/resultsContainer"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_margin="16dp"
+        android:background="@drawable/bg_inference_chip"
+        android:padding="8dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHeight_max="200dp"
-        app:layout_constraintHeight_default="wrap">
+        app:layout_constraintHeight_max="200dp">
 
-        <ScrollView
+        <!-- Summary Header -->
+        <LinearLayout
+            android:id="@+id/summaryHeader"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:fadeScrollbars="false"
-            android:scrollbars="vertical">
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="8dp"
+            android:gravity="center_vertical">
 
             <TextView
-                android:id="@+id/summaryText"
-                android:layout_width="match_parent"
+                android:id="@+id/summaryTitle"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:padding="16dp"
+                android:layout_weight="1"
+                android:text="📊 Detecciones de medicamentos"
                 android:textAppearance="?attr/textAppearanceBodyMedium"
-                android:textColor="?attr/colorOnSurface"
+                android:textStyle="bold"
+                android:ellipsize="none"
+                android:scrollHorizontally="false"
+                android:singleLine="false"
+                android:breakStrategy="balanced"
+                android:hyphenationFrequency="normal"
                 android:lineSpacingExtra="2dp"
-                android:fontFamily="monospace"
-                tools:text="📊 Resumen de detección:\n• Total detectados: 15\n• Medicamentos únicos: 7\n\n🔍 Detalle por medicamento:\n🔴 IBUFLASH_MIGRAN: 4\n🟡 GAVISCON: 3\n🟡 BUSCAPINA: 3\n🟡 DOLEZ_GRIPA: 2\n🟡 ASPIRINA_100: 2\n🟢 ALKASELTZER: 1"/>
-        </ScrollView>
-    </com.google.android.material.card.MaterialCardView>
+                android:justificationMode="inter_word"
+                android:textColor="@android:color/white" />
+
+            <TextView
+                android:id="@+id/totalCount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textAppearance="?attr/textAppearanceBodyMedium"
+                android:textStyle="bold"
+                android:textColor="@android:color/white"
+                tools:text="0 total" />
+
+        </LinearLayout>
+
+        <!-- Results List -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/resultsRecyclerView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxHeight="120dp"
+            android:nestedScrollingEnabled="true"
+            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+            tools:listitem="@layout/item_medication_result"
+            tools:itemCount="3" />
+
+    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

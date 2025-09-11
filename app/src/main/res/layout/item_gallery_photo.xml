@@ -67,6 +67,22 @@
             app:layout_constraintStart_toStartOf="@id/photoImageView"
             app:layout_constraintEnd_toEndOf="@id/photoImageView" />
 
+        <!-- ID number badge -->
+        <TextView
+            android:id="@+id/photoIdTextView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_margin="8dp"
+            android:background="@drawable/bg_inference_chip"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="2dp"
+            android:textColor="@android:color/white"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            app:layout_constraintTop_toTopOf="@id/photoImageView"
+            app:layout_constraintStart_toStartOf="@id/photoImageView"
+            tools:text="#123" />
+
         <!-- Date/time text -->
         <TextView
             android:id="@+id/dateTextView"

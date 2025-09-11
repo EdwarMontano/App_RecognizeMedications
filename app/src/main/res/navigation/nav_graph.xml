@@ -57,7 +57,15 @@
     <fragment
         android:id="@+id/photoDetailFragment"
         android:name="com.chocoplot.apprecognicemedications.presentation.results.PhotoDetailFragment"
-        android:label="Photo Detail" />
+        android:label="Photo Detail">
+        <action
+            android:id="@+id/action_photoDetailFragment_to_detectionHistoryFragment"
+            app:destination="@id/detectionHistoryFragment"
+            app:enterAnim="@anim/slide_in_bottom"
+            app:exitAnim="@anim/fade_out"
+            app:popEnterAnim="@anim/fade_in"
+            app:popExitAnim="@anim/slide_out_bottom" />
+    </fragment>
 
     <fragment
         android:id="@+id/helpFragment"
@@ -68,4 +76,8 @@
         android:id="@+id/settingsFragment"
         android:name="com.chocoplot.apprecognicemedications.presentation.settings.SettingsFragment"
         android:label="@string/settings_title" />
+    <fragment
+        android:id="@+id/detectionHistoryFragment"
+        android:name="com.chocoplot.apprecognicemedications.presentation.history.DetectionHistoryFragment"
+        android:label="Historial de Detecciones" />
 </navigation>

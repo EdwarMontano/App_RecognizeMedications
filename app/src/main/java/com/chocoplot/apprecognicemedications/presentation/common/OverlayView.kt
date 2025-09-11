@@ -103,62 +103,96 @@ class OverlayView @JvmOverloads constructor(
     }
 
     override fun onDraw(canvas: Canvas) {
-        synchronized(overlayLock) {
-            try {
-                super.onDraw(canvas)
-                
-                android.util.Log.d("OverlayView", "onDraw called. Results: ${results.size}, View size: ${width}x${height}, Source: ${sourceWidth}x${sourceHeight}")
-                
-                if (results.isEmpty() || width <= 0 || height <= 0) {
-                    android.util.Log.d("OverlayView", "No results to draw or invalid view size")
-                    return
-                }
-
-                val scaleX: Float = if (sourceWidth > 0) width.toFloat() / sourceWidth else 1f
-                val scaleY: Float = if (sourceHeight > 0) height.toFloat() / sourceHeight else 1f
-                val padding: Float = 8f * resources.displayMetrics.density
-
-                android.util.Log.d("OverlayView", "Scale factors: scaleX=$scaleX, scaleY=$scaleY")
-
-                results.forEachIndexed { index, box ->
-                    try {
-                        // Scale coordinates from normalized (0-1) to actual pixels
-                        val left = box.x1 * sourceWidth * scaleX
-                        val top = box.y1 * sourceHeight * scaleY
-                        val right = box.x2 * sourceWidth * scaleX
-                        val bottom = box.y2 * sourceHeight * scaleY
-
-                        // Validate scaled coordinates
-                        if (left < 0 || top < 0 || right > width || bottom > height ||
-                            right <= left || bottom <= top) {
-                            android.util.Log.w("OverlayView", "Skipping invalid box $index: ($left, $top, $right, $bottom)")
-                            return@forEachIndexed
-                        }
-
-                        android.util.Log.d("OverlayView", "Box $index scaled: ($left, $top, $right, $bottom)")
-
-                        val rect = RectF(left, top, right, bottom)
-                        canvas.drawRect(rect, boxPaint)
-
-                        val label = "${box.clsName} ${(box.cnf * 100).toInt()}%"
-                        val textWidth = textPaint.measureText(label)
-                        val bgRect = RectF(
-                            rect.left,
-                            max(0f, rect.top - textPaint.textSize - padding),
-                            rect.left + textWidth + padding * 2,
-                            rect.top
-                        )
-                        canvas.drawRect(bgRect, textBgPaint)
-                        canvas.drawText(label, bgRect.left + padding, rect.top - padding / 2, textPaint)
-                        
-                    } catch (e: Exception) {
-                        android.util.Log.e("OverlayView", "Error drawing box $index", e)
-                    }
-                }
-                
-            } catch (e: Exception) {
-                android.util.Log.e("OverlayView", "Error in onDraw", e)
+        try {
+            super.onDraw(canvas)
+            
+            // Quick check without synchronization for performance
+            if (results.isEmpty() || width <= 0 || height <= 0) {
+                return
             }
+            
+            // Get a snapshot of the current state with minimal synchronization
+            val currentResults: List<BoundingBox>
+            val currentSourceWidth: Int
+            val currentSourceHeight: Int
+            
+            synchronized(overlayLock) {
+                currentResults = results.toList() // Create defensive copy
+                currentSourceWidth = sourceWidth
+                currentSourceHeight = sourceHeight
+            }
+            
+            if (currentResults.isEmpty() || currentSourceWidth <= 0 || currentSourceHeight <= 0) {
+                return
+            }
+
+            // Calculate scaling factor for centerCrop behavior
+            val sourceAspectRatio = currentSourceWidth.toFloat() / currentSourceHeight.toFloat()
+            val viewAspectRatio = width.toFloat() / height.toFloat()
+            
+            val scaleX: Float
+            val scaleY: Float
+            val offsetX: Float
+            val offsetY: Float
+            
+            if (sourceAspectRatio > viewAspectRatio) {
+                // Image is wider than view, scale by height and center horizontally
+                scaleY = height.toFloat() / currentSourceHeight.toFloat()
+                scaleX = scaleY
+                offsetX = (width - currentSourceWidth * scaleX) / 2f
+                offsetY = 0f
+            } else {
+                // Image is taller than view, scale by width and center vertically
+                scaleX = width.toFloat() / currentSourceWidth.toFloat()
+                scaleY = scaleX
+                offsetX = 0f
+                offsetY = (height - currentSourceHeight * scaleY) / 2f
+            }
+
+            val padding: Float = 8f * resources.displayMetrics.density
+
+            // Draw without synchronization to avoid blocking
+            currentResults.forEachIndexed { index, box ->
+                try {
+                    // Scale coordinates from normalized (0-1) to actual pixels with centerCrop logic
+                    val left = (box.x1 * currentSourceWidth * scaleX) + offsetX
+                    val top = (box.y1 * currentSourceHeight * scaleY) + offsetY
+                    val right = (box.x2 * currentSourceWidth * scaleX) + offsetX
+                    val bottom = (box.y2 * currentSourceHeight * scaleY) + offsetY
+
+                    // Validate scaled coordinates are within view bounds
+                    if (right <= left || bottom <= top || right < 0 || bottom < 0 ||
+                        left > width || top > height) {
+                        return@forEachIndexed
+                    }
+
+                    // Clamp coordinates to view bounds
+                    val clampedLeft = left.coerceAtLeast(0f)
+                    val clampedTop = top.coerceAtLeast(0f)
+                    val clampedRight = right.coerceAtMost(width.toFloat())
+                    val clampedBottom = bottom.coerceAtMost(height.toFloat())
+
+                    val rect = RectF(clampedLeft, clampedTop, clampedRight, clampedBottom)
+                    canvas.drawRect(rect, boxPaint)
+
+                    val label = "${box.clsName} ${(box.cnf * 100).toInt()}%"
+                    val textWidth = textPaint.measureText(label)
+                    val bgRect = RectF(
+                        rect.left,
+                        max(0f, rect.top - textPaint.textSize - padding),
+                        rect.left + textWidth + padding * 2,
+                        rect.top
+                    )
+                    canvas.drawRect(bgRect, textBgPaint)
+                    canvas.drawText(label, bgRect.left + padding, rect.top - padding / 2, textPaint)
+                    
+                } catch (e: Exception) {
+                    android.util.Log.e("OverlayView", "Error drawing box $index", e)
+                }
+            }
+            
+        } catch (e: Exception) {
+            android.util.Log.e("OverlayView", "Error in onDraw", e)
         }
     }
     

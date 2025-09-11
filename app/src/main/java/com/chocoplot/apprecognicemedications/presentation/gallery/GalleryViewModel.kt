@@ -77,13 +77,39 @@ class GalleryViewModel @Inject constructor() : ViewModel(), Detector.DetectorLis
     val showErrorMessage: LiveData<String?> = _showErrorMessage
 
     private var detector: Detector? = null
+    private var isDetectorInitialized = false
+    private var isDetectorInitializing = false
 
     fun initializeDetector(context: Context) {
-        Log.d("GalleryViewModel", "Initializing detector...")
-        detector = Detector(context, Constants.MODEL_PATH, Constants.LABELS_PATH, this).apply {
-            setup()
+        if (isDetectorInitialized || isDetectorInitializing) {
+            Log.d("GalleryViewModel", "Detector already initialized or initializing")
+            return
         }
-        Log.d("GalleryViewModel", "Detector initialized")
+        
+        isDetectorInitializing = true
+        Log.d("GalleryViewModel", "Initializing detector in background...")
+        
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val newDetector = Detector(context, Constants.MODEL_PATH, Constants.LABELS_PATH, this@GalleryViewModel)
+                newDetector.setup()
+                
+                // Switch to main thread to update the detector reference
+                withContext(Dispatchers.Main) {
+                    detector = newDetector
+                    isDetectorInitialized = true
+                    Log.d("GalleryViewModel", "Detector initialized successfully")
+                }
+            } catch (e: Exception) {
+                Log.e("GalleryViewModel", "Error initializing detector", e)
+                withContext(Dispatchers.Main) {
+                    // Signal initialization failure
+                    onEmptyDetect()
+                }
+            } finally {
+                isDetectorInitializing = false
+            }
+        }
     }
 
     fun loadGalleryPhotos(context: Context) {
@@ -188,16 +214,25 @@ class GalleryViewModel @Inject constructor() : ViewModel(), Detector.DetectorLis
     fun processCurrentPhoto(context: Context) {
         val currentPhoto = _currentPhoto.value ?: return
         Log.d("GalleryViewModel", "Processing photo: ${currentPhoto.uri}")
-        viewModelScope.launch {
+        
+        if (!isDetectorInitialized) {
+            Log.w("GalleryViewModel", "Detector not initialized, skipping processing")
+            onEmptyDetect()
+            return
+        }
+        
+        viewModelScope.launch(Dispatchers.IO) {
             try {
-                val bitmap = withContext(Dispatchers.IO) {
-                    loadBitmapFromUri(context, currentPhoto.uri)
-                }
+                val bitmap = loadBitmapFromUri(context, currentPhoto.uri)
                 bitmap?.let { bmp ->
                     Log.d("GalleryViewModel", "Loaded bitmap: ${bmp.width}x${bmp.height}")
-                    // Store image size for overlay scaling
-                    _imageSize.postValue(Pair(bmp.width, bmp.height))
-                    // Process with detector
+                    
+                    // Store image size for overlay scaling on main thread
+                    withContext(Dispatchers.Main) {
+                        _imageSize.value = Pair(bmp.width, bmp.height)
+                    }
+                    
+                    // Process with detector in background
                     Log.d("GalleryViewModel", "Running detector...")
                     detector?.detect(bmp)
                 } ?: run {
@@ -206,7 +241,6 @@ class GalleryViewModel @Inject constructor() : ViewModel(), Detector.DetectorLis
                 }
             } catch (e: Exception) {
                 Log.e("GalleryViewModel", "Error processing photo", e)
-                e.printStackTrace()
                 onEmptyDetect()
             }
         }
@@ -214,16 +248,25 @@ class GalleryViewModel @Inject constructor() : ViewModel(), Detector.DetectorLis
 
     fun processImageUri(context: Context, uri: Uri) {
         Log.d("GalleryViewModel", "Processing image URI directly: $uri")
-        viewModelScope.launch {
+        
+        if (!isDetectorInitialized) {
+            Log.w("GalleryViewModel", "Detector not initialized, skipping processing")
+            onEmptyDetect()
+            return
+        }
+        
+        viewModelScope.launch(Dispatchers.IO) {
             try {
-                val bitmap = withContext(Dispatchers.IO) {
-                    loadBitmapFromUri(context, uri)
-                }
+                val bitmap = loadBitmapFromUri(context, uri)
                 bitmap?.let { bmp ->
                     Log.d("GalleryViewModel", "Loaded bitmap from URI: ${bmp.width}x${bmp.height}")
-                    // Store image size for overlay scaling
-                    _imageSize.postValue(Pair(bmp.width, bmp.height))
-                    // Process with detector
+                    
+                    // Store image size for overlay scaling on main thread
+                    withContext(Dispatchers.Main) {
+                        _imageSize.value = Pair(bmp.width, bmp.height)
+                    }
+                    
+                    // Process with detector in background
                     Log.d("GalleryViewModel", "Running detector on URI image...")
                     detector?.detect(bmp)
                 } ?: run {
@@ -232,9 +275,34 @@ class GalleryViewModel @Inject constructor() : ViewModel(), Detector.DetectorLis
                 }
             } catch (e: Exception) {
                 Log.e("GalleryViewModel", "Error processing image URI", e)
-                e.printStackTrace()
                 onEmptyDetect()
             }
+        }
+    }
+    
+    /**
+     * Process a bitmap directly without scaling/cropping to maintain aspect ratio
+     * This is used for manual detection to ensure proper aspect ratio
+     */
+    fun processImageDirectly(bitmap: Bitmap) {
+        Log.d("GalleryViewModel", "Processing bitmap directly: ${bitmap.width}x${bitmap.height}")
+        
+        if (!isDetectorInitialized) {
+            Log.w("GalleryViewModel", "Detector not initialized, skipping processing")
+            onEmptyDetect()
+            return
+        }
+        
+        try {
+            // Store original image size for overlay scaling
+            _imageSize.postValue(Pair(bitmap.width, bitmap.height))
+            
+            // Process with detector
+            Log.d("GalleryViewModel", "Running detector on original bitmap...")
+            detector?.detect(bitmap)
+        } catch (e: Exception) {
+            Log.e("GalleryViewModel", "Error processing bitmap directly", e)
+            onEmptyDetect()
         }
     }
 
@@ -420,12 +488,48 @@ class GalleryViewModel @Inject constructor() : ViewModel(), Detector.DetectorLis
     private fun loadBitmapFromUri(context: Context, uri: Uri): Bitmap? {
         return try {
             context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                BitmapFactory.decodeStream(inputStream)
+                // Use options to avoid memory issues
+                val options = BitmapFactory.Options().apply {
+                    inJustDecodeBounds = true
+                }
+                
+                // First pass: get dimensions
+                BitmapFactory.decodeStream(inputStream, null, options)
+                
+                // Reset stream
+                context.contentResolver.openInputStream(uri)?.use { newInputStream ->
+                    // Calculate sample size if image is too large
+                    options.inJustDecodeBounds = false
+                    options.inSampleSize = calculateInSampleSize(options, 1024, 1024)
+                    options.inPreferredConfig = Bitmap.Config.RGB_565 // Use less memory
+                    
+                    BitmapFactory.decodeStream(newInputStream, null, options)
+                }
             }
+        } catch (e: OutOfMemoryError) {
+            Log.e("GalleryViewModel", "OutOfMemory loading bitmap", e)
+            System.gc() // Force garbage collection
+            null
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("GalleryViewModel", "Error loading bitmap", e)
             null
         }
+    }
+    
+    private fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
+        val height = options.outHeight
+        val width = options.outWidth
+        var inSampleSize = 1
+
+        if (height > reqHeight || width > reqWidth) {
+            val halfHeight = height / 2
+            val halfWidth = width / 2
+
+            while ((halfHeight / inSampleSize) >= reqHeight && (halfWidth / inSampleSize) >= reqWidth) {
+                inSampleSize *= 2
+            }
+        }
+        return inSampleSize
     }
 
     override fun onEmptyDetect() {
@@ -442,6 +546,15 @@ class GalleryViewModel @Inject constructor() : ViewModel(), Detector.DetectorLis
 
     override fun onCleared() {
         super.onCleared()
-        detector?.clear()
+        Log.d("GalleryViewModel", "Clearing ViewModel resources")
+        
+        try {
+            detector?.clear()
+            detector = null
+            isDetectorInitialized = false
+            isDetectorInitializing = false
+        } catch (e: Exception) {
+            Log.e("GalleryViewModel", "Error clearing detector", e)
+        }
     }
 }

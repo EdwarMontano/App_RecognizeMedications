@@ -20,16 +20,21 @@ object CrashRecoveryManager {
     private const val KEY_LAST_CRASH_TIME = "last_crash_time"
     private const val KEY_OOM_COUNT = "oom_count"
     private const val KEY_CAMERA_ERROR_COUNT = "camera_error_count"
+    private const val KEY_ANR_COUNT = "anr_count"
+    private const val KEY_DETECTOR_ERROR_COUNT = "detector_error_count"
     
     // Recovery thresholds
     private const val MAX_CRASHES_PER_SESSION = 3
     private const val CRASH_RESET_INTERVAL = 24 * 60 * 60 * 1000L // 24 hours
     private const val MEMORY_PRESSURE_THRESHOLD = 0.8f // 80% memory usage
+    private const val ANR_PREVENTION_THRESHOLD = 0.85f // 85% memory usage for ANR prevention
     
     // Runtime tracking
     private val sessionCrashCount = AtomicInteger(0)
     private val sessionOomCount = AtomicInteger(0)
     private val sessionCameraErrorCount = AtomicInteger(0)
+    private val sessionAnrCount = AtomicInteger(0)
+    private val sessionDetectorErrorCount = AtomicInteger(0)
     private val lastMemoryCheck = AtomicLong(0)
     
     private var prefs: SharedPreferences? = null
@@ -75,6 +80,14 @@ object CrashRecoveryManager {
                     sessionCameraErrorCount.incrementAndGet()
                     incrementCounter(KEY_CAMERA_ERROR_COUNT)
                 }
+                CrashType.ANR -> {
+                    sessionAnrCount.incrementAndGet()
+                    incrementCounter(KEY_ANR_COUNT)
+                }
+                CrashType.DETECTOR_ERROR -> {
+                    sessionDetectorErrorCount.incrementAndGet()
+                    incrementCounter(KEY_DETECTOR_ERROR_COUNT)
+                }
                 CrashType.GENERAL -> {
                     incrementCounter(KEY_CRASH_COUNT)
                 }
@@ -114,6 +127,10 @@ object CrashRecoveryManager {
                     Log.w(TAG, "Critical memory pressure: ${(memoryUsageRatio * 100).toInt()}%")
                     MemoryStatus.CRITICAL
                 }
+                memoryUsageRatio > ANR_PREVENTION_THRESHOLD -> {
+                    Log.w(TAG, "ANR prevention threshold reached: ${(memoryUsageRatio * 100).toInt()}%")
+                    MemoryStatus.ANR_RISK
+                }
                 memoryUsageRatio > MEMORY_PRESSURE_THRESHOLD -> {
                     Log.w(TAG, "High memory pressure: ${(memoryUsageRatio * 100).toInt()}%")
                     MemoryStatus.HIGH
@@ -139,6 +156,11 @@ object CrashRecoveryManager {
                 actions.add(RecoveryAction.FORCE_GARBAGE_COLLECTION)
                 actions.add(RecoveryAction.REDUCE_CAMERA_RESOLUTION)
                 actions.add(RecoveryAction.SKIP_ML_PROCESSING)
+                actions.add(RecoveryAction.DELAY_PROCESSING)
+            } else if (memoryStatus == MemoryStatus.ANR_RISK) {
+                actions.add(RecoveryAction.FORCE_GARBAGE_COLLECTION)
+                actions.add(RecoveryAction.DELAY_PROCESSING)
+                actions.add(RecoveryAction.REDUCE_FRAME_RATE)
             } else if (memoryStatus == MemoryStatus.HIGH) {
                 actions.add(RecoveryAction.FORCE_GARBAGE_COLLECTION)
                 actions.add(RecoveryAction.REDUCE_FRAME_RATE)
@@ -151,6 +173,16 @@ object CrashRecoveryManager {
             
             if (sessionCameraErrorCount.get() > 1) {
                 actions.add(RecoveryAction.RESTART_CAMERA)
+            }
+            
+            if (sessionAnrCount.get() > 0) {
+                actions.add(RecoveryAction.DELAY_PROCESSING)
+                actions.add(RecoveryAction.BACKGROUND_PROCESSING_ONLY)
+            }
+            
+            if (sessionDetectorErrorCount.get() > 2) {
+                actions.add(RecoveryAction.SKIP_ML_PROCESSING)
+                actions.add(RecoveryAction.RESTART_DETECTOR)
             }
             
             if (isRecoveryMode) {
@@ -189,6 +221,18 @@ object CrashRecoveryManager {
                     Log.d(TAG, "Recommendation: Restart camera")
                     true
                 }
+                RecoveryAction.DELAY_PROCESSING -> {
+                    Log.d(TAG, "Recommendation: Delay processing to prevent ANR")
+                    true
+                }
+                RecoveryAction.BACKGROUND_PROCESSING_ONLY -> {
+                    Log.d(TAG, "Recommendation: Use background processing only")
+                    true
+                }
+                RecoveryAction.RESTART_DETECTOR -> {
+                    Log.d(TAG, "Recommendation: Restart detector")
+                    true
+                }
                 RecoveryAction.SAFE_MODE -> {
                     Log.d(TAG, "Recommendation: Enter safe mode")
                     true
@@ -205,8 +249,32 @@ object CrashRecoveryManager {
             crashes = sessionCrashCount.get(),
             oomErrors = sessionOomCount.get(),
             cameraErrors = sessionCameraErrorCount.get(),
+            anrEvents = sessionAnrCount.get(),
+            detectorErrors = sessionDetectorErrorCount.get(),
             isRecoveryMode = isRecoveryMode
         )
+    }
+    
+    fun checkAnrRisk(): Boolean {
+        val memoryStatus = checkMemoryPressure()
+        return memoryStatus == MemoryStatus.ANR_RISK || memoryStatus == MemoryStatus.CRITICAL || sessionAnrCount.get() > 0
+    }
+    
+    /**
+     * Allow manual detection bypass in recovery mode
+     */
+    fun allowManualDetection(): Boolean {
+        Log.d(TAG, "Manual detection allowed - bypassing recovery mode temporarily")
+        return true
+    }
+    
+    /**
+     * Reset recovery mode for manual operations
+     */
+    fun resetRecoveryMode() {
+        isRecoveryMode = false
+        sessionCrashCount.set(0)
+        Log.i(TAG, "Recovery mode reset for manual operation")
     }
     
     private fun enableRecoveryMode() {
@@ -230,6 +298,8 @@ object CrashRecoveryManager {
             putInt(KEY_CRASH_COUNT, 0)
             putInt(KEY_OOM_COUNT, 0)
             putInt(KEY_CAMERA_ERROR_COUNT, 0)
+            putInt(KEY_ANR_COUNT, 0)
+            putInt(KEY_DETECTOR_ERROR_COUNT, 0)
             putLong(KEY_LAST_CRASH_TIME, 0)
             apply()
         }
@@ -239,12 +309,15 @@ object CrashRecoveryManager {
     enum class CrashType {
         OUT_OF_MEMORY,
         CAMERA_ERROR,
+        ANR,
+        DETECTOR_ERROR,
         GENERAL
     }
     
     enum class MemoryStatus {
         NORMAL,
         HIGH,
+        ANR_RISK,
         CRITICAL
     }
     
@@ -254,6 +327,9 @@ object CrashRecoveryManager {
         REDUCE_FRAME_RATE,
         SKIP_ML_PROCESSING,
         RESTART_CAMERA,
+        DELAY_PROCESSING,
+        BACKGROUND_PROCESSING_ONLY,
+        RESTART_DETECTOR,
         SAFE_MODE
     }
     
@@ -261,6 +337,8 @@ object CrashRecoveryManager {
         val crashes: Int,
         val oomErrors: Int,
         val cameraErrors: Int,
+        val anrEvents: Int,
+        val detectorErrors: Int,
         val isRecoveryMode: Boolean
     )
 }
